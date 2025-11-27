@@ -10,11 +10,12 @@ export * from './types';
 export * from './errors';
 
 // HTTP Client
-export { HTTPClient } from './http-client';
+export { HTTPClient } from './httpClient';
 
 // Authentication
 export { default as UserAuthDeveloperAPISDK } from './auth/userAuth';
 import UserAuthDeveloperAPISDK from './auth/userAuth';
+import { HealthFacilitySDK } from './healthFacility';
 
 // Policy Holder operations
 export {
@@ -46,7 +47,6 @@ export {
 // Legacy exports for backward compatibility
 export { default as PolicyHolderDevFhirSDK } from './policyHolder';
 
-// Utility functions
 export {
     type SdkResponse,
     type FetchError,
@@ -73,6 +73,7 @@ export class DeveloperAPISDK {
     public readonly config: DeveloperAPISDKConfig;
     public readonly auth: UserAuthDeveloperAPISDK;
     public readonly policyHolder: PolicyHolderSDK;
+    public readonly healthFacility: HealthFacilitySDK;
 
     constructor(config: DeveloperAPISDKConfig) {
         this.config = config;
@@ -80,6 +81,7 @@ export class DeveloperAPISDK {
         // Initialize modules
         this.auth = new UserAuthDeveloperAPISDK(config.baseUrl);
         this.policyHolder = new PolicyHolderSDK(config);
+        this.healthFacility = new HealthFacilitySDK(config);
     }
 
     /**
@@ -117,7 +119,6 @@ export class DeveloperAPISDK {
 // Default export
 export default DeveloperAPISDK;
 
-// Named exports for common usage patterns
 export {
     UserAuthDeveloperAPISDK as AuthSDK
 };

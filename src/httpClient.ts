@@ -21,8 +21,8 @@ export class HTTPClient {
     private defaultHeaders: Record<string, string>;
 
     constructor(config: SDKConfig) {
-        this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-        this.defaultTimeout = config.timeout || 30000; // 30 seconds
+        this.baseUrl = config.baseUrl.replace(/\/$/, '');
+        this.defaultTimeout = config.timeout || 30000;
         this.defaultRetries = config.retries || 3;
         this.defaultHeaders = {
             'Content-Type': 'application/json',

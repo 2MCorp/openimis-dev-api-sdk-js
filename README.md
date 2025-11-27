@@ -5,8 +5,7 @@ A comprehensive TypeScript SDK for OpenIMIS Developer API FHIR endpoints. Provid
 ## Features
 
 - **Authentication Management** - Secure token-based authentication
-- **Policy Holder Operations** - Search and manage policy holders, employees, and patients
-- **FHIR R4 Compliance** - Full support for FHIR R4 standard
+- **Policy Holder Operations** - Search and manage policy holder, employees, and patients
 - **Data Conversion** - Seamless conversion between FHIR and domain models
 - **Error Handling** - Comprehensive error classes and validation
 - **HTTP Client** - Advanced HTTP client with retry logic and timeout handling

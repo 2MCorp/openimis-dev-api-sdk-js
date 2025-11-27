@@ -1,6 +1,6 @@
 import { EmployeeFhirConverter, EmployeeModel } from '../converters/employeeConverter';
 import { PatientFhirConverter, PatientModel } from '../converters/patientConverter';
-import { HTTPClient } from '../http-client';
+import { HTTPClient } from '../httpClient';
 import {
   SDKConfig,
   APIResponse,

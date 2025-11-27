@@ -140,7 +140,7 @@ export interface Employee extends Patient {
     currency: string;
 }
 
-// Policy holder related types
+
 export interface PolicyHolderSearchParams {
     chfId?: string;
     name?: string;
