@@ -73,3 +73,11 @@ $RECYCLE.BIN/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Build output
+lib/
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
