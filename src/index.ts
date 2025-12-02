@@ -1,124 +1,79 @@
 /**
  * Developer API FHIR Client SDK
- * 
+ *
  * A comprehensive TypeScript SDK for interacting with OpenIMIS Developer API FHIR endpoints.
  * Provides authentication, patient/employee management, and policy holder operations.
  */
 
-// Core types and interfaces
-export * from './types';
-export * from './errors';
+export * from "./types";
+export * from "./errors";
 
-// HTTP Client
-export { HTTPClient } from './httpClient';
+export { HTTPClient } from "./httpClient";
 
-// Authentication
-export { default as UserAuthDeveloperAPISDK } from './auth/userAuth';
-import UserAuthDeveloperAPISDK from './auth/userAuth';
-import { HealthFacilitySDK } from './healthFacility';
+export { default as UserAuthDeveloperAPISDK } from "./auth/userAuth";
+import UserAuthDeveloperAPISDK from "./auth/userAuth";
+import { HealthFacilitySDK } from "./healthFacility";
 
-// Policy Holder operations
+export { PolicyHolderSDK } from "./policyHolder";
+import { PolicyHolderSDK } from "./policyHolder";
+
+export { BaseFhirConverter, type FHIRConverter } from "./converters/base";
+
+export { PatientModel } from './models/patient';
 export {
-    PolicyHolderSDK
-} from './policyHolder';
-import { PolicyHolderSDK } from './policyHolder';
+  PatientFhirConverter,
+} from "./converters/patientConverter";
 
-// Converters and Models
-export {
-    BaseFhirConverter,
-    type FHIRConverter
-} from './converters/base';
 
-export {
-    AddressModel,
-    AddressFhirConverter
-} from './converters/address';
+export { default as PolicyHolderDevFhirSDK } from "./policyHolder";
 
-export {
-    PatientModel,
-    PatientFhirConverter
-} from './converters/patientConverter';
+export { type SdkResponse, type FetchError, postReq, getReq } from "./utils";
 
-export {
-    EmployeeModel,
-    EmployeeFhirConverter
-} from './converters/employeeConverter';
-
-// Legacy exports for backward compatibility
-export { default as PolicyHolderDevFhirSDK } from './policyHolder';
-
-export {
-    type SdkResponse,
-    type FetchError,
-    postReq,
-    getReq
-} from './utls';
-
-/**
- * Main SDK Configuration Interface
- */
 export interface DeveloperAPISDKConfig {
-    baseUrl: string;
-    timeout?: number;
-    retries?: number;
-    apiVersion?: string;
+  baseUrl: string;
+  timeout?: number;
+  retries?: number;
+  apiVersion?: string;
 }
 
-/**
- * Main SDK Class
- * 
- * Provides a unified interface to all SDK functionality.
- */
 export class DeveloperAPISDK {
-    public readonly config: DeveloperAPISDKConfig;
-    public readonly auth: UserAuthDeveloperAPISDK;
-    public readonly policyHolder: PolicyHolderSDK;
-    public readonly healthFacility: HealthFacilitySDK;
+  public readonly config: DeveloperAPISDKConfig;
+  public readonly auth: UserAuthDeveloperAPISDK;
+  public readonly policyHolder: PolicyHolderSDK;
+  public readonly healthFacility: HealthFacilitySDK;
 
-    constructor(config: DeveloperAPISDKConfig) {
-        this.config = config;
+  constructor(config: DeveloperAPISDKConfig) {
+    this.config = config;
 
-        // Initialize modules
-        this.auth = new UserAuthDeveloperAPISDK(config.baseUrl);
-        this.policyHolder = new PolicyHolderSDK(config);
-        this.healthFacility = new HealthFacilitySDK(config);
-    }
+    this.auth = new UserAuthDeveloperAPISDK(config.baseUrl);
+    this.policyHolder = new PolicyHolderSDK(config);
+    this.healthFacility = new HealthFacilitySDK(config);
+  }
 
-    /**
-     * Set authentication token for all modules
-     */
-    setAuthToken(token: string): void {
-        this.policyHolder.setAuthToken(token);
-    }
+  setAuthToken(token: string): void {
+    this.policyHolder.setAuthToken(token);
+  }
 
-    /**
-     * Get SDK version information
-     */
-    static getVersion(): string {
-        return '1.0.0';
-    }
+  static getVersion(): string {
+    return "1.0.0";
+  }
 
-    /**
-     * Get SDK information
-     */
-    static getInfo(): {
-        name: string;
-        version: string;
-        description: string;
-        author: string;
-    } {
-        return {
-            name: 'developer_api_fhir_client',
-            version: DeveloperAPISDK.getVersion(),
-            description: 'A comprehensive TypeScript SDK for OpenIMIS Developer API FHIR endpoints',
-            author: '2MCorp'
-        };
-    }
+  static getInfo(): {
+    name: string;
+    version: string;
+    description: string;
+    author: string;
+  } {
+    return {
+      name: "developer_api_fhir_client",
+      version: DeveloperAPISDK.getVersion(),
+      description:
+        "A comprehensive TypeScript SDK for OpenIMIS Developer API FHIR endpoints",
+      author: "2MCorp",
+    };
+  }
 }
 
-// Default export
 export default DeveloperAPISDK;
 
-export {
-    UserAuthDeveloperAPISDK as AuthSDK
-};
+export { UserAuthDeveloperAPISDK as AuthSDK };

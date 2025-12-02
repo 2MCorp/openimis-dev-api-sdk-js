@@ -1,12 +1,12 @@
 {
   "name": "developer_api_fhir_client_js",
   "version": "1.0.0",
+  "type": "module",
   "description": "A comprehensive TypeScript SDK for OpenIMIS Developer API FHIR endpoints. Provides authentication, patient/employee management, and policy holder operations.",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "exports": {
     ".": {
-      "require": "./lib/index.js",
       "import": "./lib/index.js",
       "types": "./lib/index.d.ts"
     }
@@ -64,14 +64,15 @@
   "homepage": "https://github.com/2MCorp/developer_api_fhir_client_js#readme",
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.2",
+    "@types/node": "^24.10.1",
     "jest": "^30.2.0",
-    "ts-jest": "^29.4.5",
-    "ts-node": "^10.9.1",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.13.2",
+    "fhir_resources_ts": "github:Dawda-2m-Corp/fhir_resources_ts"
   },
   "peerDependencies": {
     "typescript": ">=4.0.0"

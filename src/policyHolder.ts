@@ -1,32 +1,28 @@
-import { EmployeeFhirConverter, EmployeeModel } from '../converters/employeeConverter';
-import { PatientFhirConverter, PatientModel } from '../converters/patientConverter';
-import { HTTPClient } from '../httpClient';
+
+import {
+  PatientFhirConverter,
+} from "./converters/patientConverter";
+import { HTTPClient } from "./httpClient";
 import {
   SDKConfig,
   APIResponse,
   PaginatedResponse,
-  PolicyHolderSearchParams
-} from '../types';
-import {
-  ValidationError,
-  SDKError
-} from '../errors';
+  PolicyHolderSearchParams,
+} from "./types";
+import { ValidationError, SDKError } from "./errors";
+import { EmployeeFhirConverter } from "./converters/employeeConverter";
+import { EmployeeModel } from "./models/employee";
+import { PatientModel } from "./models/patient";
 
-/**
- * Policy Holder search result interface
- */
 interface PolicyHolderSearchResult {
   employees: EmployeeModel[];
   patients: PatientModel[];
   total: number;
 }
 
-/**
- * FHIR Bundle response structure
- */
 interface FHIRBundle {
-  resourceType: 'Bundle';
-  type: 'searchset' | 'collection';
+  resourceType: "Bundle";
+  type: "searchset" | "collection";
   total?: number;
   entry?: Array<{
     resource: any;
@@ -34,9 +30,6 @@ interface FHIRBundle {
   }>;
 }
 
-/**
- * Policy Holder SDK for FHIR operations
- */
 export class PolicyHolderSDK {
   private httpClient: HTTPClient;
   private readonly employeeConverter = new EmployeeFhirConverter();
@@ -50,141 +43,126 @@ export class PolicyHolderSDK {
     }
   }
 
-  /**
-   * Set authentication token for requests
-   */
   setAuthToken(token: string): void {
     if (!token?.trim()) {
-      throw new ValidationError('Authentication token cannot be empty');
+      throw new ValidationError("Authentication token cannot be empty");
     }
     this.httpClient.setAuthToken(token);
   }
 
-  /**
-   * Search for employee by CHF ID
-   */
-  async searchEmployee(chfId: string): Promise<APIResponse<EmployeeModel | null>> {
+  async searchEmployee(
+    chfId: string,
+  ): Promise<APIResponse<EmployeeModel | null>> {
     try {
       this.validateChfId(chfId);
 
       const response = await this.httpClient.get(
-        `/search-employee/?identifier=${encodeURIComponent(chfId)}`
+        `/search-employee/?identifier=${encodeURIComponent(chfId)}`,
       );
 
       const bundle = response.data as FHIRBundle;
 
       if (!this.isValidBundle(bundle)) {
-        throw new ValidationError('Invalid FHIR Bundle response received');
+        throw new ValidationError("Invalid FHIR Bundle response received");
       }
 
-      // Extract employee data from bundle
       const employee = this.extractEmployeeFromBundle(bundle);
 
       return {
         success: true,
-        message: employee ? 'Employee found successfully' : 'No employee found',
+        message: employee ? "Employee found successfully" : "No employee found",
         data: employee,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       if (error instanceof SDKError) {
         throw error;
       }
 
       throw new ValidationError(
-        'Failed to search employee',
+        "Failed to search employee",
         { chfId },
-        error as Error
+        error as Error,
       );
     }
   }
 
-  /**
-   * Search for patient by CHF ID
-   */
-  async searchPatient(chfId: string): Promise<APIResponse<PatientModel | null>> {
+  async searchPatient(
+    chfId: string,
+  ): Promise<APIResponse<PatientModel | null>> {
     try {
       this.validateChfId(chfId);
 
       const response = await this.httpClient.get(
-        `/Patient?identifier=${encodeURIComponent(chfId)}`
+        `/Patient?identifier=${encodeURIComponent(chfId)}`,
       );
 
       const bundle = response.data as FHIRBundle;
 
       if (!this.isValidBundle(bundle)) {
-        throw new ValidationError('Invalid FHIR Bundle response received');
+        throw new ValidationError("Invalid FHIR Bundle response received");
       }
 
-      // Extract patient data from bundle
       const patient = this.extractPatientFromBundle(bundle);
 
       return {
         success: true,
-        message: patient ? 'Patient found successfully' : 'No patient found',
+        message: patient ? "Patient found successfully" : "No patient found",
         data: patient,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       if (error instanceof SDKError) {
         throw error;
       }
 
       throw new ValidationError(
-        'Failed to search patient',
+        "Failed to search patient",
         { chfId },
-        error as Error
+        error as Error,
       );
     }
   }
 
-  /**
-   * Search policy holders with various parameters
-   */
   async searchPolicyHolders(
-    params: PolicyHolderSearchParams
+    params: PolicyHolderSearchParams,
   ): Promise<PaginatedResponse<PolicyHolderSearchResult>> {
     try {
       this.validateSearchParams(params);
 
-      // Build query parameters
       const queryParams = new URLSearchParams();
 
       if (params.chfId) {
-        queryParams.append('identifier', params.chfId);
+        queryParams.append("identifier", params.chfId);
       }
 
       if (params.name) {
-        queryParams.append('name', params.name);
+        queryParams.append("name", params.name);
       }
 
       if (params.limit) {
-        queryParams.append('_count', params.limit.toString());
+        queryParams.append("_count", params.limit.toString());
       }
 
       if (params.offset) {
-        queryParams.append('_offset', params.offset.toString());
+        queryParams.append("_offset", params.offset.toString());
       }
 
       const response = await this.httpClient.get(
-        `/Patient?${queryParams.toString()}`
+        `/Patient?${queryParams.toString()}`,
       );
 
       const bundle = response.data as FHIRBundle;
 
       if (!this.isValidBundle(bundle)) {
-        throw new ValidationError('Invalid FHIR Bundle response received');
+        throw new ValidationError("Invalid FHIR Bundle response received");
       }
 
-      // Process all entries
       const employees: EmployeeModel[] = [];
       const patients: PatientModel[] = [];
 
-      bundle.entry?.forEach(entry => {
+      bundle.entry?.forEach((entry) => {
         try {
-          // Try to convert as employee first, fall back to patient
           const employee = this.employeeConverter.fromFhir(entry.resource);
           employees.push(employee);
         } catch {
@@ -192,7 +170,7 @@ export class PolicyHolderSDK {
             const patient = this.patientConverter.fromFhir(entry.resource);
             patients.push(patient);
           } catch (conversionError) {
-            console.warn('Failed to convert FHIR entry:', conversionError);
+            console.warn("Failed to convert FHIR entry:", conversionError);
           }
         }
       });
@@ -200,77 +178,68 @@ export class PolicyHolderSDK {
       const result: PolicyHolderSearchResult = {
         employees,
         patients,
-        total: employees.length + patients.length
+        total: employees.length + patients.length,
       };
 
       return {
         success: true,
-        message: 'Search completed successfully',
+        message: "Search completed successfully",
         data: [result],
         pagination: {
           page: Math.floor((params.offset || 0) / (params.limit || 10)) + 1,
           limit: params.limit || 10,
           total: bundle.total || result.total,
-          totalPages: Math.ceil((bundle.total || result.total) / (params.limit || 10))
+          totalPages: Math.ceil(
+            (bundle.total || result.total) / (params.limit || 10),
+          ),
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       if (error instanceof SDKError) {
         throw error;
       }
 
       throw new ValidationError(
-        'Failed to search policy holders',
+        "Failed to search policy holders",
         { params },
-        error as Error
+        error as Error,
       );
     }
   }
 
-  /**
-   * Validate CHF ID format
-   */
   private validateChfId(chfId: string): void {
     if (!chfId?.trim()) {
-      throw new ValidationError('CHF ID is required');
+      throw new ValidationError("CHF ID is required");
     }
 
     if (chfId.length < 2) {
-      throw new ValidationError('CHF ID must be at least 2 characters long');
+      throw new ValidationError("CHF ID must be at least 2 characters long");
     }
   }
 
-  /**
-   * Validate search parameters
-   */
   private validateSearchParams(params: PolicyHolderSearchParams): void {
     if (!params.chfId && !params.name) {
-      throw new ValidationError('Either CHF ID or name must be provided for search');
+      throw new ValidationError(
+        "Either CHF ID or name must be provided for search",
+      );
     }
 
     if (params.limit && (params.limit < 1 || params.limit > 100)) {
-      throw new ValidationError('Limit must be between 1 and 100');
+      throw new ValidationError("Limit must be between 1 and 100");
     }
 
     if (params.offset && params.offset < 0) {
-      throw new ValidationError('Offset must be non-negative');
+      throw new ValidationError("Offset must be non-negative");
     }
   }
 
-  /**
-   * Validate FHIR Bundle structure
-   */
   private isValidBundle(bundle: any): bundle is FHIRBundle {
-    return bundle &&
-      bundle.resourceType === 'Bundle' &&
-      Array.isArray(bundle.entry);
+    return (
+      bundle && bundle.resourceType === "Bundle" && Array.isArray(bundle.entry)
+    );
   }
 
-  /**
-   * Extract employee from FHIR Bundle
-   */
   private extractEmployeeFromBundle(bundle: FHIRBundle): EmployeeModel | null {
     if (!bundle.entry || bundle.entry.length === 0) {
       return null;
@@ -284,9 +253,6 @@ export class PolicyHolderSDK {
     }
   }
 
-  /**
-   * Extract patient from FHIR Bundle
-   */
   private extractPatientFromBundle(bundle: FHIRBundle): PatientModel | null {
     if (!bundle.entry || bundle.entry.length === 0) {
       return null;
@@ -301,21 +267,4 @@ export class PolicyHolderSDK {
   }
 }
 
-// Legacy class for backward compatibility
-export class PolicyHolderDevFhirSDK {
-  private policyHolderSDK: PolicyHolderSDK;
-
-  constructor(authToken: string, baseUrl: string, policyHolderPrefixUrl?: string) {
-    this.policyHolderSDK = new PolicyHolderSDK({
-      baseUrl: `${baseUrl}${policyHolderPrefixUrl || ''}`,
-      authToken
-    });
-  }
-
-  async searchEmployee(chfId: string): Promise<EmployeeModel | null> {
-    const result = await this.policyHolderSDK.searchEmployee(chfId);
-    return result.data || null;
-  }
-}
-
-export default PolicyHolderDevFhirSDK;
+export default PolicyHolderSDK;

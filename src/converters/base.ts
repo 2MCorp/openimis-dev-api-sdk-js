@@ -4,12 +4,10 @@ export interface FHIRConverter<T, F = any> {
   toFhir(domainData: T): F;
 }
 
-export abstract class BaseFhirConverter<T, F = any>
-  implements FHIRConverter<T, F>
-{
-  abstract fromFhir(fhirData: F): T;
+export abstract class BaseFhirConverter {
+  abstract fromFhir(data: BaseFhirConverter): any;
 
-  abstract toFhir(domainData: T): F;
+  abstract toFhir(data: BaseFhirConverter): any;
 
   protected safeExtract<V>(
     data: any,

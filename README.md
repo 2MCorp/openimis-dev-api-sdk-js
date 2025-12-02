@@ -7,6 +7,7 @@ A comprehensive TypeScript SDK for OpenIMIS Developer API FHIR endpoints. Provid
 - **Authentication Management** - Secure token-based authentication
 - **Policy Holder Operations** - Search and manage policy holder, employees, and patients
 - **Data Conversion** - Seamless conversion between FHIR and domain models
+- **Web Framework Compatible** - Full serialization support for SvelteKit, Next.js, and other frameworks
 - **Error Handling** - Comprehensive error classes and validation
 - **HTTP Client** - Advanced HTTP client with retry logic and timeout handling
 - **TypeScript First** - Full TypeScript support with strict typing
@@ -79,6 +80,95 @@ const policyHolder = new PolicyHolderDevFhirSDK(
   "https://api.openimis.org",
   "/policyholder"
 );
+```
+
+## Web Framework Integration
+
+The SDK provides full serialization support for modern web frameworks like SvelteKit, Next.js, and Nuxt.js that require plain objects for server-side rendering and data transfer.
+
+### SvelteKit Example
+
+```typescript
+// src/routes/patients/[id]/+page.server.ts
+import { DeveloperAPISDK } from "developer_api_fhir_client_js";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async ({ params }) => {
+  const sdk = new DeveloperAPISDK({
+    baseUrl: "https://api.openimis.org/api/v1",
+  });
+
+  // Authenticate
+  const authResult = await sdk.auth.login("username", "password");
+  if (authResult.success) {
+    sdk.setAuthToken(authResult.data.access_token);
+
+    // Search for patients - returns serializable plain objects
+    const patients = await sdk.healthFacility.searchPatientByChfId(params.id);
+
+    return {
+      patients, // This serializes correctly for SvelteKit
+    };
+  }
+
+  return { patients: [] };
+};
+```
+
+### Next.js Example
+
+```typescript
+// pages/api/patients/[id].ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { DeveloperAPISDK } from "developer_api_fhir_client_js";
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const { id } = req.query;
+
+  const sdk = new DeveloperAPISDK({
+    baseUrl: "https://api.openimis.org/api/v1",
+  });
+
+  const authResult = await sdk.auth.login("username", "password");
+  if (authResult.success) {
+    sdk.setAuthToken(authResult.data.access_token);
+
+    // Returns serializable data
+    const patients = await sdk.healthFacility.searchPatientByChfId(
+      id as string
+    );
+    res.status(200).json({ patients });
+  } else {
+    res.status(401).json({ error: "Authentication failed" });
+  }
+}
+```
+
+### Serialization Details
+
+The SDK automatically converts FHIR data to plain objects that are safe for serialization:
+
+```typescript
+// Patient data structure (serializable)
+interface PatientData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender?: string;
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  address?: {
+    text?: string;
+    city?: string;
+    district?: string;
+    state?: string;
+    postalCode?: string;
+  };
+}
 ```
 
 ## API Reference

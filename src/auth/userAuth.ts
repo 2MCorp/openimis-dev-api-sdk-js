@@ -1,4 +1,5 @@
-import { postReq, type SdkResponse, FetchError } from '../utls';
+import axios from 'axios';
+import { postReq, type SdkResponse } from '../utils';
 
 class UserAuthDeveloperAPISDK {
   baseUrl: string;
@@ -6,7 +7,7 @@ class UserAuthDeveloperAPISDK {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    this.baseAuthUrl = `${baseUrl}/authentication/user-auth/`;
+    this.baseAuthUrl = `${baseUrl}authentication/user-auth/`;
   }
 
   async login(username: string, password: string): Promise<SdkResponse> {
@@ -19,19 +20,25 @@ class UserAuthDeveloperAPISDK {
       return {
         success: true,
         message: "Login successful",
-        data: response.data,
+        data: response.data as { token: string, expiry: string },
       };
     } catch (error: unknown) {
-      const err = error as FetchError;
+      if (axios.isAxiosError(error)) {
+        return {
+          success: false,
+          message: "failed to login",
+          errorDetails: [
+            error.response?.data?.detail ??
+            error.response?.data?.message ??
+            error.message
+          ],
+        };
+      }
 
       return {
         success: false,
         message: "failed to login",
-        errorDetails: [
-          err.response?.data?.detail ??
-          err.response?.data?.message ??
-          err.message
-        ],
+        errorDetails: [String(error)],
       };
     }
   }
@@ -45,14 +52,20 @@ class UserAuthDeveloperAPISDK {
         data: response.data,
       };
     } catch (error) {
-      const err = error as FetchError;
+      if (axios.isAxiosError(error)) {
+        return {
+          success: false,
+          message: "failed to retrieve user info",
+          errorDetails: [
+            error.response?.data?.detail ?? error.message,
+          ],
+        };
+      }
 
       return {
         success: false,
         message: "failed to retrieve user info",
-        errorDetails: [
-          err.response?.data?.detail ?? err.message,
-        ],
+        errorDetails: [String(error)],
       };
     }
   }
@@ -66,14 +79,20 @@ class UserAuthDeveloperAPISDK {
         data: response.data,
       };
     } catch (error) {
-      const err = error as FetchError;
+      if (axios.isAxiosError(error)) {
+        return {
+          success: false,
+          message: "failed to logout",
+          errorDetails: [
+            error.response?.data?.detail ?? error.message,
+          ],
+        };
+      }
 
       return {
         success: false,
         message: "failed to logout",
-        errorDetails: [
-          err.response?.data?.detail ?? err.message,
-        ],
+        errorDetails: [String(error)],
       };
     }
   }
@@ -87,14 +106,20 @@ class UserAuthDeveloperAPISDK {
         data: response.data,
       };
     } catch (error) {
-      const err = error as FetchError;
+      if (axios.isAxiosError(error)) {
+        return {
+          success: false,
+          message: "failed to logout from all sessions",
+          errorDetails: [
+            error.response?.data?.detail ?? error.message,
+          ],
+        };
+      }
 
       return {
         success: false,
         message: "failed to logout from all sessions",
-        errorDetails: [
-          err.response?.data?.detail ?? err.message,
-        ],
+        errorDetails: [String(error)],
       };
     }
   }
