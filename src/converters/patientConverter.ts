@@ -26,6 +26,6 @@ export class PatientFhirConverter extends BaseFhirClientConverter {
     }
 
     toFhir(patient: any): any {
-        return ""
+        return JSON.stringify(patient);
     }
 }
