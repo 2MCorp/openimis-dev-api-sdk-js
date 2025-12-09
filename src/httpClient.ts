@@ -36,7 +36,7 @@ export class HTTPClient {
    * Set authentication token
    */
   setAuthToken(token: string): void {
-    this.axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    this.axiosInstance.defaults.headers.common['Authorization'] = `Token ${token}`;
   }
 
   /**

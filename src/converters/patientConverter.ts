@@ -14,17 +14,18 @@ export class PatientFhirConverter extends BaseFhirClientConverter {
             chfId: String(fhirPatientInstance.identifier?.[1]?.value || ""),
             uuid: String(fhirPatientInstance.identifier?.[0]?.value || ""),
             isHead: Boolean(fhirPatientInstance.extension?.[0]?.valueBoolean || false),
-            hasCardIssues: Boolean(fhirPatientInstance.extension?.[1]?.valueBoolean || false),
+            hasCardIssued: Boolean(fhirPatientInstance.extension?.[1]?.valueBoolean || false),
             family: new GroupModel({
                 uuid: String(fhirPatientInstance.extension?.[2]?.valueReference?.identifier?.value || ""),
                 name: String(fhirPatientInstance.extension?.[2]?.valueReference?.display || "")
-            })
+            }),
+            contained: fhirPatientInstance.contained
+
         });
         return patient;
     }
 
     toFhir(patient: any): any {
-        console.log(patient);
         return ""
     }
 }

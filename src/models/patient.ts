@@ -6,8 +6,9 @@ export class PatientModel {
     chfId?: string;
     uuid: string;
     isHead?: boolean = false;
-    hasCardIssues?: boolean = false;
+    hasCardIssued?: boolean = false;
     family?: GroupModel;
+    contained?: any;
 
     constructor(data: PatientModel) {
         this.lastName = data.lastName || '';
@@ -15,7 +16,8 @@ export class PatientModel {
         this.chfId = data.chfId;
         this.uuid = data.uuid;
         this.isHead = data.isHead || false;
-        this.hasCardIssues = data.hasCardIssues || false;
+        this.hasCardIssued = data.hasCardIssued || false;
         this.family = data.family;
+        this.contained = data.contained;
     }
 }

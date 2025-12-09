@@ -31,6 +31,10 @@ export abstract class BaseFhirConverter {
     }
   }
 
+  toJson(): string {
+    return JSON.stringify(this);
+  }
+
   protected findIdentifierBySystem(
     identifiers: any[],
     system: string,
