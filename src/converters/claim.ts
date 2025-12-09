@@ -45,6 +45,6 @@ export class ClaimFhirConverter extends BaseFhirClientConverter {
     }
 
     toFhir(claim: any): any {
-        return ""
+        return JSON.stringify(claim);
     }
 }
