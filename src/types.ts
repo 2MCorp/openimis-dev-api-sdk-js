@@ -1,6 +1,6 @@
 
 
-export class HttpClient {
+export default class HttpClient {
     constructor(
         private readonly baseUrl: string,
         private readonly token?: string
