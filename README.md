@@ -216,4 +216,4 @@ pnpm run build    # emits dist/ (JS + .d.ts)
 
 ## License
 
-ISC
+[ISC](./LICENSE)
