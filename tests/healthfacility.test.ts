@@ -39,10 +39,11 @@ describe("HealthFacilityDevAPIClient", () => {
       const { http, client } = createClient();
       http.on("GET", "/health-facility-dev-api/search-patient/", samplePatientFhir());
 
-      const patient = await client.patients.getByChfId("CHF123456");
+      const result = await client.patients.getByChfId("CHF123456");
 
-      expect(patient.chfId).toBe("CHF123456");
-      expect(patient.lastName).toBe("Doe");
+      expect(result.success).toBe(true);
+      expect(result.data?.chfId).toBe("CHF123456");
+      expect(result.data?.lastName).toBe("Doe");
       expect(http.lastCall?.path).toContain("identifier=CHF123456");
       expect(http.lastCall?.options?.skipAuth).toBe(true);
     });
@@ -73,18 +74,20 @@ describe("HealthFacilityDevAPIClient", () => {
         searchBundle("Claim", [sampleClaimFhir()])
       );
 
-      const page = await client.claims.list(
+      const result = await client.claims.list(
         new ClaimListFilters(0, 10, undefined, undefined, undefined, "CHF123456", "entered")
       );
 
-      expect(page.total).toBe(1);
-      expect(page.items[0]?.code).toBe("CLM-001");
-      expect(page.items[0]?.patientChfId).toBe("CHF123456");
+      expect(result.success).toBe(true);
+      expect(result.statusCode).toBe("200");
+      expect(result.data?.total).toBe(1);
+      expect(result.data?.items[0]?.code).toBe("CLM-001");
+      expect(result.data?.items[0]?.patientChfId).toBe("CHF123456");
       expect(http.lastCall?.path).toContain("page-offset=0");
       expect(http.lastCall?.path).toContain("_count=10");
       expect(http.lastCall?.path).toContain("patientChfid=CHF123456");
       expect(http.lastCall?.path).toContain("status=entered");
-      expect(page.nextUrl).toBe("https://example.test/next");
+      expect(result.data?.nextUrl).toBe("https://example.test/next");
     });
 
     it("gets, updates, patches, and submits claims", async () => {
@@ -100,11 +103,13 @@ describe("HealthFacilityDevAPIClient", () => {
         });
 
       const got = await client.claims.get("CLM-001");
-      expect(got.code).toBe("CLM-001");
+      expect(got.success).toBe(true);
+      expect(got.data?.code).toBe("CLM-001");
 
       const model = new ClaimModel("id", "CLM-001", "ENTERED", "CHF123456");
       const updated = await client.claims.update("CLM-001", model);
-      expect(updated.code).toBe("CLM-001");
+      expect(updated.success).toBe(true);
+      expect(updated.data?.code).toBe("CLM-001");
       expect(http.calls.at(-1)?.method).toBe("PUT");
       expect((http.calls.at(-1)?.body as fhir4.Claim).resourceType).toBe("Claim");
 
@@ -112,7 +117,8 @@ describe("HealthFacilityDevAPIClient", () => {
       expect(http.calls.at(-1)?.method).toBe("PATCH");
 
       const submit = await client.claims.submit([model]);
-      expect(submit.message).toBe("submitted");
+      expect(submit.success).toBe(true);
+      expect(submit.data?.message).toBe("submitted");
       expect(http.calls.at(-1)?.path).toBe(
         "/health-facility-dev-api/claims/$submit/"
       );
@@ -149,16 +155,19 @@ describe("HealthFacilityDevAPIClient", () => {
           "A00"
         )
       );
-      expect(page.items).toHaveLength(1);
+      expect(page.success).toBe(true);
+      expect(page.data?.items).toHaveLength(1);
       expect(http.lastCall?.path).toContain("primaryDiagnosisCode=A00");
       expect(http.lastCall?.path).toContain("page-offset=1");
 
       const model = new ClaimModel("id", "ENC-1", "ENTERED", "CHF123456");
       const created = await client.encounters.create(model);
-      expect(created.patientChfId).toBe("CHF123456");
+      expect(created.success).toBe(true);
+      expect(created.data?.patientChfId).toBe("CHF123456");
 
       const bulk = await client.encounters.bulkSubmit([model]);
-      expect(bulk.message).toBe("ok");
+      expect(bulk.success).toBe(true);
+      expect(bulk.data?.message).toBe("ok");
       expect(http.lastCall?.path).toBe(
         "/health-facility-dev-api/encounters/$bulk-submit/"
       );
@@ -178,13 +187,15 @@ describe("HealthFacilityDevAPIClient", () => {
         .on("POST", "/health-facility-dev-api/preauthorizations/", fhir);
 
       const page = await client.preauthorizations.list(new FhirListParams(0, 20));
-      expect(page.items[0]?.id).toBeTruthy();
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.id).toBeTruthy();
       expect(http.lastCall?.path).toContain("_count=20");
 
       const created = await client.preauthorizations.create(
         new PreauthorizationModel("preauth-1", "Entered", "CHF123456")
       );
-      expect(created.patientChfId).toBe("CHF123456");
+      expect(created.success).toBe(true);
+      expect(created.data?.patientChfId).toBe("CHF123456");
     });
   });
 
@@ -210,11 +221,13 @@ describe("HealthFacilityDevAPIClient", () => {
       const page = await client.claimItems.list(
         new ClaimLineListFilters(0, 10, "22222222-2222-4222-8222-222222222222")
       );
-      expect(page.items[0]?.code).toBe("ITEM001");
-      expect(page.items[0]?.quantity).toBe(2);
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.code).toBe("ITEM001");
+      expect(page.data?.items[0]?.quantity).toBe(2);
 
       const got = await client.claimItems.get("ci-1");
-      expect(got.id).toBe("ci-1");
+      expect(got.success).toBe(true);
+      expect(got.data?.id).toBe("ci-1");
 
       const model = new ClaimChargeItemModel(
         "ci-1",
@@ -257,10 +270,12 @@ describe("HealthFacilityDevAPIClient", () => {
         );
 
       const services = await client.claimServices.list();
-      expect(services.items[0]?.id).toBe("svc-ci");
+      expect(services.success).toBe(true);
+      expect(services.data?.items[0]?.id).toBe("svc-ci");
 
       const attachments = await client.claimAttachments.list();
-      expect(attachments.items[0]?.filename ?? attachments.items[0]?.title).toBe(
+      expect(attachments.success).toBe(true);
+      expect(attachments.data?.items[0]?.filename ?? attachments.data?.items[0]?.title).toBe(
         "lab-report.pdf"
       );
 
@@ -268,7 +283,8 @@ describe("HealthFacilityDevAPIClient", () => {
         new ClaimAttachmentModel(undefined, "lab-report.pdf", "lab-report.pdf", "application/pdf"),
         "claim-uuid"
       );
-      expect(created.id).toBe("att-1");
+      expect(created.success).toBe(true);
+      expect(created.data?.id).toBe("att-1");
       expect(
         (http.lastCall?.body as fhir4.DocumentReference).identifier?.[0]?.value
       ).toBe("claim-uuid");
@@ -303,20 +319,24 @@ describe("HealthFacilityDevAPIClient", () => {
         );
 
       const meds = await client.medications.list(new FhirListParams(0, 5));
-      expect(meds.items[0]?.code).toBe("PARA500");
+      expect(meds.success).toBe(true);
+      expect(meds.data?.items[0]?.code).toBe("PARA500");
       expect(http.calls.at(-1)?.options?.skipAuth).toBe(true);
 
       const services = await client.services.list();
-      expect(services.items[0]?.code).toBe("CONS01");
-      expect(services.items[0]?.name).toBe("Consultation");
+      expect(services.success).toBe(true);
+      expect(services.data?.items[0]?.code).toBe("CONS01");
+      expect(services.data?.items[0]?.name).toBe("Consultation");
       expect(http.calls.at(-1)?.options?.skipAuth).toBe(true);
 
       const diagnoses = await client.diagnoses.list();
-      expect(diagnoses.items[0]?.code).toBe("A00");
+      expect(diagnoses.success).toBe(true);
+      expect(diagnoses.data?.items[0]?.code).toBe("A00");
       expect(http.calls.at(-1)?.options?.skipAuth).toBe(true);
 
       const one = await client.diagnoses.get("icd-1");
-      expect(one[0]?.code).toBe("A00");
+      expect(one.success).toBe(true);
+      expect(one.data?.[0]?.code).toBe("A00");
       expect(http.lastCall?.options?.skipAuth).toBe(true);
     });
   });
@@ -331,7 +351,8 @@ describe("HealthFacilityDevAPIClient", () => {
       );
 
       const byCode = await client.facilities.searchByCode("VIHC001");
-      expect(byCode.items[0]?.code).toBe("VIHC001");
+      expect(byCode.success).toBe(true);
+      expect(byCode.data?.items[0]?.code).toBe("VIHC001");
       expect(http.lastCall?.path).toContain("hf_code=VIHC001");
       expect(http.lastCall?.options?.skipAuth).toBe(true);
 
@@ -358,7 +379,8 @@ describe("HealthFacilityDevAPIClient", () => {
         )
       );
 
-      expect(page.items[0]?.chfId).toBe("CHF123456");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.chfId).toBe("CHF123456");
       expect(http.lastCall?.path).toContain("chfid=CHF123456");
       expect(http.lastCall?.path).toContain("include=Coverage");
     });

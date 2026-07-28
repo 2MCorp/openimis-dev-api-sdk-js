@@ -1,4 +1,4 @@
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import { buildQuery } from "../healthfacility/types";
 import {
   HealthFacilityMetricResponse,
@@ -16,11 +16,13 @@ class DashboardMetricsClient {
    */
   async policyHolder(
     params: DashboardQueryParams = new DashboardQueryParams()
-  ): Promise<PolicyHolderMetricResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  ): Promise<ApiResponse<PolicyHolderMetricResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/metric/policy-holder/${buildQuery(params.toQuery())}`
     );
-    return PolicyHolderMetricResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      PolicyHolderMetricResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   /**
@@ -29,22 +31,26 @@ class DashboardMetricsClient {
    */
   async healthFacility(
     params: DashboardQueryParams = new DashboardQueryParams()
-  ): Promise<HealthFacilityMetricResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  ): Promise<ApiResponse<HealthFacilityMetricResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/metric/health-facility/${buildQuery(params.toQuery())}`
     );
-    return HealthFacilityMetricResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      HealthFacilityMetricResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   /**
    * GET /dashboard/metric/system/
    * Auth: System Api-Key only (`authScheme: "Api-Key"`).
    */
-  async system(): Promise<SystemMetricResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  async system(): Promise<ApiResponse<SystemMetricResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/metric/system/`
     );
-    return SystemMetricResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      SystemMetricResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 }
 

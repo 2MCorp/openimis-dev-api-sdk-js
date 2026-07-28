@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import ClaimFhirConverter from "../fhir_converter/claims";
 import { ClaimModel } from "../models/claim";
 import { FhirSearchPage } from "../models/pagination";
@@ -23,24 +23,29 @@ class FormalSectorEmployeeClaimsClient {
    */
   async list(
     filters: EmployeeClaimListFilters
-  ): Promise<FhirSearchPage<ClaimModel>> {
+  ): Promise<ApiResponse<FhirSearchPage<ClaimModel>>> {
     if (!filters.identifier) {
-      throw new Error(
+      return ApiResponse.fail(
+        "400",
         "employeeClaims.list requires identifier (PolicyHolderInsuree UUID)"
       );
     }
 
-    const data = await this.httpClient.get<unknown>(
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/employee-claims/${buildQuery(filters.toQuery())}`
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 
-  async get(pk: string): Promise<ClaimModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(pk: string): Promise<ApiResponse<ClaimModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/employee-claims/${encodeURIComponent(pk)}/`
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Claim>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
   }
 }
 

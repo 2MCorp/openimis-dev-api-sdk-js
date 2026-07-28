@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import { MedicalServiceModel } from "../models/medical_service";
 import { FhirSearchPage } from "../models/pagination";
 import { parseSearchBundle } from "../fhir_converter/helpers";
@@ -22,30 +22,34 @@ class EmrServicesClient {
    */
   async list(
     params: FhirListParams = new FhirListParams()
-  ): Promise<FhirSearchPage<MedicalServiceModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<MedicalServiceModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${EMR_BASE_PATH}/services/${buildQuery(params.toQuery())}`
     );
-    const page = parseSearchBundle(asFhirBundle(data), (resource) =>
-      medicalServiceFromChargeItemDefinition(
-        resource as fhir4.ChargeItemDefinition
-      )
-    );
-    return new FhirSearchPage(
-      page.total,
-      page.items,
-      page.selfUrl,
-      page.nextUrl,
-      page.previousUrl
-    );
+    return mapData(response, (data) => {
+      const page = parseSearchBundle(asFhirBundle(data), (resource) =>
+        medicalServiceFromChargeItemDefinition(
+          resource as fhir4.ChargeItemDefinition
+        )
+      );
+      return new FhirSearchPage(
+        page.total,
+        page.items,
+        page.selfUrl,
+        page.nextUrl,
+        page.previousUrl
+      );
+    });
   }
 
-  async get(identifier: string): Promise<MedicalServiceModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(identifier: string): Promise<ApiResponse<MedicalServiceModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${EMR_BASE_PATH}/services/${encodeURIComponent(identifier)}/`
     );
-    return medicalServiceFromChargeItemDefinition(
-      asFhirResource<fhir4.ChargeItemDefinition>(data)
+    return mapData(response, (data) =>
+      medicalServiceFromChargeItemDefinition(
+        asFhirResource<fhir4.ChargeItemDefinition>(data)
+      )
     );
   }
 }

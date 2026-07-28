@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData, passData } from "../types";
 import { ClaimChargeItemModel } from "../models/claim_charge_item";
 import { FhirSearchPage } from "../models/pagination";
 import { parseSearchBundle } from "../fhir_converter/helpers";
@@ -18,61 +18,61 @@ class HealthFacilityClaimItemsClient {
 
   async list(
     filters: ClaimLineListFilters = new ClaimLineListFilters()
-  ): Promise<FhirSearchPage<ClaimChargeItemModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<ClaimChargeItemModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${HF_BASE_PATH}/claim-or-encounter-items/${buildQuery(filters.toQuery())}`
     );
-    const page = parseSearchBundle(asFhirBundle(data), (resource) =>
-      chargeItemFromFhir(resource as fhir4.ChargeItem, "item")
-    );
-    return new FhirSearchPage(
-      page.total,
-      page.items,
-      page.selfUrl,
-      page.nextUrl,
-      page.previousUrl
-    );
+    return mapData(response, (data) => {
+      const page = parseSearchBundle(asFhirBundle(data), (resource) =>
+        chargeItemFromFhir(resource as fhir4.ChargeItem, "item")
+      );
+      return new FhirSearchPage(
+        page.total,
+        page.items,
+        page.selfUrl,
+        page.nextUrl,
+        page.previousUrl
+      );
+    });
   }
 
-  async get(identifier: string): Promise<ClaimChargeItemModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(identifier: string): Promise<ApiResponse<ClaimChargeItemModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${HF_BASE_PATH}/claim-or-encounter-items/${encodeURIComponent(identifier)}/`
     );
-    return chargeItemFromFhir(
-      asFhirResource<fhir4.ChargeItem>(data),
-      "item"
+    return mapData(response, (data) =>
+      chargeItemFromFhir(asFhirResource<fhir4.ChargeItem>(data), "item")
     );
   }
 
-  async create(item: ClaimChargeItemModel): Promise<ClaimChargeItemModel> {
-    const data = await this.httpClient.post<unknown>(
+  async create(item: ClaimChargeItemModel): Promise<ApiResponse<ClaimChargeItemModel>> {
+    const response = await this.httpClient.post<unknown>(
       `${HF_BASE_PATH}/claim-or-encounter-items/`,
       chargeItemToFhir(item)
     );
-    return chargeItemFromFhir(
-      asFhirResource<fhir4.ChargeItem>(data),
-      "item"
+    return mapData(response, (data) =>
+      chargeItemFromFhir(asFhirResource<fhir4.ChargeItem>(data), "item")
     );
   }
 
   async update(
     identifier: string,
     item: ClaimChargeItemModel
-  ): Promise<ClaimChargeItemModel> {
-    const data = await this.httpClient.put<unknown>(
+  ): Promise<ApiResponse<ClaimChargeItemModel>> {
+    const response = await this.httpClient.put<unknown>(
       `${HF_BASE_PATH}/claim-or-encounter-items/${encodeURIComponent(identifier)}/`,
       chargeItemToFhir(item)
     );
-    return chargeItemFromFhir(
-      asFhirResource<fhir4.ChargeItem>(data),
-      "item"
+    return mapData(response, (data) =>
+      chargeItemFromFhir(asFhirResource<fhir4.ChargeItem>(data), "item")
     );
   }
 
-  async delete(identifier: string): Promise<void> {
-    await this.httpClient.delete<void>(
+  async delete(identifier: string): Promise<ApiResponse<null>> {
+    const response = await this.httpClient.delete(
       `${HF_BASE_PATH}/claim-or-encounter-items/${encodeURIComponent(identifier)}/`
     );
+    return passData<null>(response, "Deleted");
   }
 }
 

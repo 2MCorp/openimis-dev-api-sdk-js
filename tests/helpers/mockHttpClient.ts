@@ -1,5 +1,5 @@
 import type { RequestOptions } from "../../src/types";
-import HttpClient from "../../src/types";
+import HttpClient, { ApiResponse } from "../../src/types";
 
 export type HttpCall = {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -10,7 +10,7 @@ export type HttpCall = {
 
 /**
  * In-memory HttpClient stand-in for unit tests.
- * Match responses by method + path prefix or exact path.
+ * Returns `ApiResponse` envelopes like the real client.
  */
 export class MockHttpClient {
   public readonly calls: HttpCall[] = [];
@@ -18,15 +18,49 @@ export class MockHttpClient {
     method: HttpCall["method"];
     match: string | RegExp;
     response: unknown | ((call: HttpCall) => unknown);
+    statusCode?: number | string;
+    success?: boolean;
+    message?: string;
+    errorDetails?: unknown[];
   }> = [];
 
   on(
     method: HttpCall["method"],
     match: string | RegExp,
-    response: unknown | ((call: HttpCall) => unknown)
+    response: unknown | ((call: HttpCall) => unknown),
+    options: {
+      statusCode?: number | string;
+      success?: boolean;
+      message?: string;
+      errorDetails?: unknown[];
+    } = {}
   ): this {
-    this.handlers.push({ method, match, response });
+    this.handlers.push({
+      method,
+      match,
+      response,
+      statusCode: options.statusCode,
+      success: options.success,
+      message: options.message,
+      errorDetails: options.errorDetails,
+    });
     return this;
+  }
+
+  /** Register a failed HTTP response for a path. */
+  onError(
+    method: HttpCall["method"],
+    match: string | RegExp,
+    statusCode: number | string,
+    message: string,
+    errorDetails: unknown[] = []
+  ): this {
+    return this.on(method, match, null, {
+      statusCode,
+      success: false,
+      message,
+      errorDetails,
+    });
   }
 
   asHttpClient(): HttpClient {
@@ -42,7 +76,7 @@ export class MockHttpClient {
     path: string,
     body?: unknown,
     options?: RequestOptions
-  ): Promise<unknown> {
+  ): Promise<ApiResponse<unknown>> {
     const call: HttpCall = { method, path, body, options };
     this.calls.push(call);
 
@@ -59,7 +93,11 @@ export class MockHttpClient {
       });
 
     if (!handler) {
-      throw new Error(`No mock response for ${method} ${path}`);
+      return Promise.resolve(
+        ApiResponse.fail("500", `No mock response for ${method} ${path}`, [
+          `No mock response for ${method} ${path}`,
+        ], { path, method })
+      );
     }
 
     const value =
@@ -67,27 +105,55 @@ export class MockHttpClient {
         ? handler.response(call)
         : handler.response;
 
-    return Promise.resolve(value);
+    if (handler.success === false) {
+      return Promise.resolve(
+        ApiResponse.fail(
+          handler.statusCode ?? 500,
+          handler.message ?? "Error",
+          handler.errorDetails ?? [],
+          { path, method }
+        )
+      );
+    }
+
+    const status = handler.statusCode ?? (value === undefined ? 204 : 200);
+    return Promise.resolve(
+      ApiResponse.ok(value ?? null, status, handler.message, { path, method })
+    );
   }
 
-  get<T>(path: string, options?: RequestOptions): Promise<T> {
-    return this.resolve("GET", path, undefined, options) as Promise<T>;
+  get<T>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.resolve("GET", path, undefined, options) as Promise<ApiResponse<T>>;
   }
 
-  post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return this.resolve("POST", path, body, options) as Promise<T>;
+  post<T>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
+    return this.resolve("POST", path, body, options) as Promise<ApiResponse<T>>;
   }
 
-  put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return this.resolve("PUT", path, body, options) as Promise<T>;
+  put<T>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
+    return this.resolve("PUT", path, body, options) as Promise<ApiResponse<T>>;
   }
 
-  patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    return this.resolve("PATCH", path, body, options) as Promise<T>;
+  patch<T>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
+    return this.resolve("PATCH", path, body, options) as Promise<ApiResponse<T>>;
   }
 
-  delete<T>(path: string, options?: RequestOptions): Promise<T> {
-    return this.resolve("DELETE", path, undefined, options) as Promise<T>;
+  delete<T>(path: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.resolve("DELETE", path, undefined, options) as Promise<
+      ApiResponse<T>
+    >;
   }
 }
 

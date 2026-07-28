@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import EmployeeFhirConverter from "../fhir_converter/employee";
 import BinaryFhirConverter from "../fhir_converter/binary";
 import { EmployeeModel } from "../models/employee";
@@ -23,56 +23,68 @@ class FormalSectorEmployeesClient {
 
   async list(
     filters: EmployeeListFilters = new EmployeeListFilters()
-  ): Promise<FhirSearchPage<EmployeeModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<EmployeeModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/employees/${buildQuery(filters.toQuery())}`
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 
-  async get(pk: string): Promise<EmployeeModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(pk: string): Promise<ApiResponse<EmployeeModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/employees/${encodeURIComponent(pk)}/`
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Patient>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
+    );
   }
 
-  async create(employee: EmployeeModel): Promise<EmployeeModel> {
-    const data = await this.httpClient.post<unknown>(
+  async create(employee: EmployeeModel): Promise<ApiResponse<EmployeeModel>> {
+    const response = await this.httpClient.post<unknown>(
       `${PH_BASE_PATH}/employees/`,
       this.converter.toFhir(employee)
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Patient>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
+    );
   }
 
   /** POST employees/upload-binary/ → Bundle collection of Patients. */
   async uploadBinary(
     binary: BinaryModel,
     query: EmployeeBinaryUploadQuery = new EmployeeBinaryUploadQuery()
-  ): Promise<EmployeeModel[]> {
-    const data = await this.httpClient.post<unknown>(
+  ): Promise<ApiResponse<EmployeeModel[]>> {
+    const response = await this.httpClient.post<unknown>(
       `${PH_BASE_PATH}/employees/upload-binary/${buildQuery(query.toQuery())}`,
       this.binaryConverter.toFhir(binary)
     );
-    return this.converter.fromBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromBundle(asFhirBundle(data))
+    );
   }
 
   /** POST employees/batch-upload/ → Bundle collection of Patients. */
-  async batchUpload(employees: EmployeeModel[]): Promise<EmployeeModel[]> {
+  async batchUpload(employees: EmployeeModel[]): Promise<ApiResponse<EmployeeModel[]>> {
     const bundle = this.converter.toCollectionBundle(employees);
-    const data = await this.httpClient.post<unknown>(
+    const response = await this.httpClient.post<unknown>(
       `${PH_BASE_PATH}/employees/batch-upload/`,
       bundle
     );
-    return this.converter.fromBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromBundle(asFhirBundle(data))
+    );
   }
 
-  async batchUploadBundle(bundle: fhir4.Bundle): Promise<EmployeeModel[]> {
-    const data = await this.httpClient.post<unknown>(
+  async batchUploadBundle(bundle: fhir4.Bundle): Promise<ApiResponse<EmployeeModel[]>> {
+    const response = await this.httpClient.post<unknown>(
       `${PH_BASE_PATH}/employees/batch-upload/`,
       bundle
     );
-    return this.converter.fromBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromBundle(asFhirBundle(data))
+    );
   }
 }
 

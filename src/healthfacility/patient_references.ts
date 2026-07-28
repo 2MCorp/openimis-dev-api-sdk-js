@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import PatientFhirConverter from "../fhir_converter/patient";
 import { PatientModel } from "../models/patient";
 import { FhirSearchPage } from "../models/pagination";
@@ -19,34 +19,36 @@ class HealthFacilityPatientReferencesClient {
 
   async list(
     filters: PatientReferenceListFilters = new PatientReferenceListFilters()
-  ): Promise<FhirSearchPage<PatientModel>> {
+  ): Promise<ApiResponse<FhirSearchPage<PatientModel>>> {
     const query = {
       ...filters.toQuery(),
       include: filters.include,
     };
-    const data = await this.httpClient.get<unknown>(
+    const response = await this.httpClient.get<unknown>(
       `${HF_BASE_PATH}/patient-references/${buildQuery(query)}`
     );
 
-    const page = parseSearchBundle(asFhirBundle(data), (resource) => {
-      if (resource.resourceType === "Bundle") {
-        const nested = resource as fhir4.Bundle;
-        const first = nested.entry?.[0]?.resource as fhir4.Patient | undefined;
-        if (!first) {
-          return new PatientModel("", "", "", "");
+    return mapData(response, (data) => {
+      const page = parseSearchBundle(asFhirBundle(data), (resource) => {
+        if (resource.resourceType === "Bundle") {
+          const nested = resource as fhir4.Bundle;
+          const first = nested.entry?.[0]?.resource as fhir4.Patient | undefined;
+          if (!first) {
+            return new PatientModel("", "", "", "");
+          }
+          return this.converter.fromFhir(first);
         }
-        return this.converter.fromFhir(first);
-      }
-      return this.converter.fromFhir(resource as fhir4.Patient);
-    });
+        return this.converter.fromFhir(resource as fhir4.Patient);
+      });
 
-    return new FhirSearchPage(
-      page.total,
-      page.items,
-      page.selfUrl,
-      page.nextUrl,
-      page.previousUrl
-    );
+      return new FhirSearchPage(
+        page.total,
+        page.items,
+        page.selfUrl,
+        page.nextUrl,
+        page.previousUrl
+      );
+    });
   }
 }
 

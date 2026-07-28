@@ -32,11 +32,12 @@ describe("DashboardDevAPIClient", () => {
         new DashboardQueryParams(6, "month", "2024-01-01", "2024-06-30", 60)
       );
 
-      expect(result.employees.total_active).toBe(10);
-      expect(result.claimsSummary.approved).toBe(7);
-      expect(result.filterApplied.months).toBe(6);
-      expect(result.filterApplied.expiringDays).toBe(60);
-      expect(result.raw.employees).toBeTruthy();
+      expect(result.success).toBe(true);
+      expect(result.data?.employees.total_active).toBe(10);
+      expect(result.data?.claimsSummary.approved).toBe(7);
+      expect(result.data?.filterApplied.months).toBe(6);
+      expect(result.data?.filterApplied.expiringDays).toBe(60);
+      expect(result.data?.raw.employees).toBeTruthy();
       expect(http.lastCall?.path).toContain("months=6");
       expect(http.lastCall?.path).toContain("granularity=month");
       expect(http.lastCall?.path).toContain("date_from=2024-01-01");
@@ -55,10 +56,11 @@ describe("DashboardDevAPIClient", () => {
         new DashboardQueryParams(6, "week", undefined, undefined, undefined, 5)
       );
 
-      expect(result.claims.total).toBe(20);
-      expect(result.openQueues.claims_entered).toBe(5);
-      expect(result.timeSeries).toHaveLength(1);
-      expect(result.filterApplied.recentLimit).toBe(5);
+      expect(result.success).toBe(true);
+      expect(result.data?.claims.total).toBe(20);
+      expect(result.data?.openQueues.claims_entered).toBe(5);
+      expect(result.data?.timeSeries).toHaveLength(1);
+      expect(result.data?.filterApplied.recentLimit).toBe(5);
       expect(http.lastCall?.path).toContain("granularity=week");
       expect(http.lastCall?.path).toContain("recent_limit=5");
     });
@@ -69,8 +71,9 @@ describe("DashboardDevAPIClient", () => {
 
       const result = await client.metrics.system();
 
-      expect(result.apiKeys.system).toMatchObject({ total: 1, active: 1 });
-      expect(result.insureeUsers.verified).toBe(4);
+      expect(result.success).toBe(true);
+      expect(result.data?.apiKeys.system).toMatchObject({ total: 1, active: 1 });
+      expect(result.data?.insureeUsers.verified).toBe(4);
       expect(http.lastCall?.path).toBe("/dashboard/metric/system/");
     });
   });
@@ -88,10 +91,11 @@ describe("DashboardDevAPIClient", () => {
         new DashboardQueryParams(6)
       );
 
-      expect(result.comparisons.current.employees).toBe(10);
-      expect(result.comparisons.deltaPct.employees).toBe(25);
-      expect(result.insights[0]?.code).toBe("payment_gap");
-      expect(result.paymentGap.collection_rate).toBe(0.7);
+      expect(result.success).toBe(true);
+      expect(result.data?.comparisons.current.employees).toBe(10);
+      expect(result.data?.comparisons.deltaPct.employees).toBe(25);
+      expect(result.data?.insights[0]?.code).toBe("payment_gap");
+      expect(result.data?.paymentGap.collection_rate).toBe(0.7);
       expect(http.lastCall?.path).toContain("/dashboard/analytics/policy-holder/");
     });
 
@@ -115,9 +119,10 @@ describe("DashboardDevAPIClient", () => {
         )
       );
 
-      expect(result.rates.approval_rate).toBe(0.8);
-      expect(result.sla.within_sla_pct).toBe(0.9);
-      expect(result.filterApplied.slaHours).toBe(48);
+      expect(result.success).toBe(true);
+      expect(result.data?.rates.approval_rate).toBe(0.8);
+      expect(result.data?.sla.within_sla_pct).toBe(0.9);
+      expect(result.data?.filterApplied.slaHours).toBe(48);
       expect(http.lastCall?.path).toContain("sla_hours=48");
     });
 
@@ -131,8 +136,9 @@ describe("DashboardDevAPIClient", () => {
 
       const result = await client.analytics.system(new DashboardQueryParams(3));
 
-      expect(result.apiKeyLifecycle.created).toBe(2);
-      expect(result.pluginHealth.enabled).toBe(7);
+      expect(result.success).toBe(true);
+      expect(result.data?.apiKeyLifecycle.created).toBe(2);
+      expect(result.data?.pluginHealth.enabled).toBe(7);
       expect(http.lastCall?.path).toContain("months=3");
     });
   });

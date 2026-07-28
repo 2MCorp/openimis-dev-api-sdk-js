@@ -4,7 +4,7 @@ import HealthFacilityDevAPIClient from "./healthfacility";
 import DashboardDevAPIClient from "./dashboard";
 import EmrDevAPIClient from "./emr";
 import FhirConverter from "./fhir_converter";
-import HttpClient, { ApiError } from "./types";
+import HttpClient, { ApiError, ApiResponse, mapData, passData } from "./types";
 import type { AuthScheme, HttpClientOptions, RequestOptions } from "./types";
 
 class OpenIMISDevApiSdk {
@@ -36,6 +36,9 @@ export {
   FhirConverter,
   HttpClient,
   ApiError,
+  ApiResponse,
+  mapData,
+  passData,
 };
 export type { AuthScheme, HttpClientOptions, RequestOptions };
 export * from "./auth/types";

@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import { PaymentReconciliationFhirConverter } from "../fhir_converter/payment";
 import { PaymentReconciliationModel } from "../models/payment";
 import { FhirSearchPage } from "../models/pagination";
@@ -20,28 +20,30 @@ class FormalSectorPaymentsClient {
 
   async list(
     params: FhirListParams = new FhirListParams()
-  ): Promise<FhirSearchPage<PaymentReconciliationModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<PaymentReconciliationModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/payments/${buildQuery(params.toQuery())}`
     );
-    const page = parseSearchBundle(asFhirBundle(data), (resource) =>
-      this.converter.fromFhir(resource as fhir4.PaymentReconciliation)
-    );
-    return new FhirSearchPage(
-      page.total,
-      page.items,
-      page.selfUrl,
-      page.nextUrl,
-      page.previousUrl
-    );
+    return mapData(response, (data) => {
+      const page = parseSearchBundle(asFhirBundle(data), (resource) =>
+        this.converter.fromFhir(resource as fhir4.PaymentReconciliation)
+      );
+      return new FhirSearchPage(
+        page.total,
+        page.items,
+        page.selfUrl,
+        page.nextUrl,
+        page.previousUrl
+      );
+    });
   }
 
-  async get(pk: string): Promise<PaymentReconciliationModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(pk: string): Promise<ApiResponse<PaymentReconciliationModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/payments/${encodeURIComponent(pk)}/`
     );
-    return this.converter.fromFhir(
-      asFhirResource<fhir4.PaymentReconciliation>(data)
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.PaymentReconciliation>(data))
     );
   }
 }

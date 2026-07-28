@@ -45,7 +45,8 @@ describe("FormalSectorDevAPIClient", () => {
       );
 
       const byChf = await client.searchEmployees.getByChfId("CHF123456");
-      expect(byChf.chfId).toBe("CHF123456");
+      expect(byChf.success).toBe(true);
+      expect(byChf.data?.chfId).toBe("CHF123456");
       expect(http.lastCall?.path).toContain("identifier=CHF123456");
       expect(http.lastCall?.options?.skipAuth).toBe(true);
 
@@ -85,29 +86,34 @@ describe("FormalSectorDevAPIClient", () => {
       const page = await client.employees.list(
         new EmployeeListFilters(0, 25, "CHF999", "Smith", "Jane")
       );
-      expect(page.items[0]?.lastName).toBe("Smith");
-      expect(page.items[0]?.chfId).toBe("CHF999");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.lastName).toBe("Smith");
+      expect(page.data?.items[0]?.chfId).toBe("CHF999");
       expect(http.lastCall?.path).toContain("_chfid=CHF999");
       expect(http.lastCall?.path).toContain("_last_name=Smith");
       expect(http.lastCall?.path).toContain("_count=25");
 
       const got = await client.employees.get("42");
-      expect(got.employeeId).toBe("42");
+      expect(got.success).toBe(true);
+      expect(got.data?.employeeId).toBe("42");
 
       const model = new EmployeeModel("42", "Smith", "Jane", "CHF999");
       const created = await client.employees.create(model);
-      expect(created.chfId).toBe("CHF999");
+      expect(created.success).toBe(true);
+      expect(created.data?.chfId).toBe("CHF999");
       expect((http.lastCall?.body as fhir4.Patient).resourceType).toBe("Patient");
 
       const batch = await client.employees.batchUpload([model]);
-      expect(batch).toHaveLength(1);
+      expect(batch.success).toBe(true);
+      expect(batch.data).toHaveLength(1);
       expect((http.lastCall?.body as fhir4.Bundle).type).toBe("collection");
 
       const uploaded = await client.employees.uploadBinary(
         new BinaryModel("text/csv", "Y29udGVudA==", "15"),
         new EmployeeBinaryUploadQuery("15", "CP01", "Basic")
       );
-      expect(uploaded).toHaveLength(1);
+      expect(uploaded.success).toBe(true);
+      expect(uploaded.data).toHaveLength(1);
       expect(http.lastCall?.path).toContain(
         "policy_holder_contribution_plan_id=15"
       );
@@ -123,14 +129,16 @@ describe("FormalSectorDevAPIClient", () => {
       const group = await client.groups.getByEmployeeUuid(
         "33333333-3333-4333-8333-333333333333"
       );
-      expect(group?.id).toBe("group-1");
+      expect(group.success).toBe(true);
+      expect(group.data?.id).toBe("group-1");
       expect(http.lastCall?.path).toContain(
         "_employee_uuid=33333333-3333-4333-8333-333333333333"
       );
 
       http.on("GET", "/policy-holder-dev-api/groups/", null);
       const missing = await client.groups.getByEmployeeUuid("missing");
-      expect(missing).toBeNull();
+      expect(missing.success).toBe(true);
+      expect(missing.data).toBeNull();
     });
   });
 
@@ -150,17 +158,20 @@ describe("FormalSectorDevAPIClient", () => {
       const page = await client.contracts.list(
         new ContractListFilters(0, 10, "CTR-001", "2024-01-01")
       );
-      expect(page.items[0]?.code).toBe("CTR-001");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.code).toBe("CTR-001");
       expect(http.lastCall?.path).toContain("code=CTR-001");
       expect(http.lastCall?.path).toContain("date_approved=2024-01-01");
 
       const got = await client.contracts.get("contract-1");
-      expect(got.id).toBe("contract-1");
+      expect(got.success).toBe(true);
+      expect(got.data?.id).toBe("contract-1");
 
       const created = await client.contracts.create(
         new ContractModel("contract-1", "CTR-001", "executed")
       );
-      expect(created.code).toBe("CTR-001");
+      expect(created.success).toBe(true);
+      expect(created.data?.code).toBe("CTR-001");
       expect((http.lastCall?.body as fhir4.Contract).resourceType).toBe(
         "Contract"
       );
@@ -182,11 +193,13 @@ describe("FormalSectorDevAPIClient", () => {
       const page = await client.insurancePlans.list(
         new InsurancePlanListFilters(0, 5, "FS-BASIC")
       );
-      expect(page.items[0]?.name).toBe("Formal Sector Plan");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.name).toBe("Formal Sector Plan");
       expect(http.lastCall?.path).toContain("code=FS-BASIC");
 
       const got = await client.insurancePlans.get("15");
-      expect(got.id).toBe("15");
+      expect(got.success).toBe(true);
+      expect(got.data?.id).toBe("15");
     });
 
     it("lists and gets payments", async () => {
@@ -201,11 +214,13 @@ describe("FormalSectorDevAPIClient", () => {
         .on("GET", "/policy-holder-dev-api/payments/pay-1/", fhir);
 
       const page = await client.payments.list(new FhirListParams(0, 10));
-      expect(page.items[0]?.id).toBe("pay-1");
-      expect(page.items[0]?.amount).toBe(250);
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.id).toBe("pay-1");
+      expect(page.data?.items[0]?.amount).toBe(250);
 
       const got = await client.payments.get("pay-1");
-      expect(got.status).toBe("active");
+      expect(got.success).toBe(true);
+      expect(got.data?.status).toBe("active");
     });
 
     it("lists and gets staffs", async () => {
@@ -220,12 +235,14 @@ describe("FormalSectorDevAPIClient", () => {
         .on("GET", "/policy-holder-dev-api/staffs/staff-uuid-1/", fhir);
 
       const page = await client.staffs.list();
-      expect(page.items[0]?.id).toBe("7");
-      expect(page.items[0]?.uuid).toBe("staff-uuid-1");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.id).toBe("7");
+      expect(page.data?.items[0]?.uuid).toBe("staff-uuid-1");
 
       const got = await client.staffs.get("staff-uuid-1");
-      expect(got.active).toBe(true);
-      expect(got.uuid).toBe("staff-uuid-1");
+      expect(got.success).toBe(true);
+      expect(got.data?.active).toBe(true);
+      expect(got.data?.uuid).toBe("staff-uuid-1");
     });
   });
 
@@ -238,9 +255,12 @@ describe("FormalSectorDevAPIClient", () => {
         searchBundle("Claim", [sampleClaimFhir()])
       );
 
-      await expect(
-        client.employeeClaims.list(new EmployeeClaimListFilters())
-      ).rejects.toThrow(/identifier/);
+      const missingId = await client.employeeClaims.list(
+        new EmployeeClaimListFilters()
+      );
+      expect(missingId.success).toBe(false);
+      expect(missingId.statusCode).toBe("400");
+      expect(missingId.message).toMatch(/identifier/);
 
       const page = await client.employeeClaims.list(
         new EmployeeClaimListFilters(
@@ -249,7 +269,8 @@ describe("FormalSectorDevAPIClient", () => {
           "44444444-4444-4444-8444-444444444444"
         )
       );
-      expect(page.items[0]?.code).toBe("CLM-001");
+      expect(page.success).toBe(true);
+      expect(page.data?.items[0]?.code).toBe("CLM-001");
       expect(http.lastCall?.path).toContain(
         "identifier=44444444-4444-4444-8444-444444444444"
       );
@@ -260,7 +281,8 @@ describe("FormalSectorDevAPIClient", () => {
         sampleClaimFhir()
       );
       const got = await client.employeeClaims.get("CLM-001");
-      expect(got.patientChfId).toBe("CHF123456");
+      expect(got.success).toBe(true);
+      expect(got.data?.patientChfId).toBe("CHF123456");
     });
   });
 });

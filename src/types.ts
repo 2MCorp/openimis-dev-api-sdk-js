@@ -1,3 +1,9 @@
+import {
+  ApiResponse,
+  defaultErrorMessage,
+  parseErrorBody,
+} from "./api_response";
+
 export type AuthScheme = "Token" | "Bearer" | "Api-Key";
 
 export interface HttpClientOptions {
@@ -19,6 +25,10 @@ export interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+/**
+ * @deprecated Prefer `ApiResponse` envelopes from HttpClient.
+ * Kept for callers that still catch thrown errors via `throwOnError`.
+ */
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -30,19 +40,18 @@ export class ApiError extends Error {
   }
 
   private static messageFromBody(status: number, body: unknown): string {
-    if (body && typeof body === "object") {
-      const record = body as Record<string, unknown>;
-      if (typeof record.detail === "string") {
-        return record.detail;
-      }
-      if (typeof record.error === "string") {
-        return record.error;
-      }
-      if (typeof record.message === "string") {
-        return record.message;
-      }
-    }
-    return `HTTP ${status}`;
+    return parseErrorBody(body, status).message || defaultErrorMessage(status);
+  }
+
+  static fromResponse<T>(response: ApiResponse<T>): ApiError {
+    return new ApiError(
+      Number(response.statusCode) || 0,
+      {
+        detail: response.message,
+        error_details: response.errorDetails,
+      },
+      response.message
+    );
   }
 }
 
@@ -90,23 +99,41 @@ export default class HttpClient {
     this.claimAdminCode = claimAdminCode;
   }
 
-  get<T>(path: string, options?: RequestOptions): Promise<T> {
+  get<T = unknown>(
+    path: string,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     return this.request<T>("GET", path, undefined, options);
   }
 
-  post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  post<T = unknown>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     return this.request<T>("POST", path, body, options);
   }
 
-  put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  put<T = unknown>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     return this.request<T>("PUT", path, body, options);
   }
 
-  patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+  patch<T = unknown>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     return this.request<T>("PATCH", path, body, options);
   }
 
-  delete<T>(path: string, options?: RequestOptions): Promise<T> {
+  delete<T = unknown>(
+    path: string,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
     return this.request<T>("DELETE", path, undefined, options);
   }
 
@@ -138,25 +165,49 @@ export default class HttpClient {
     path: string,
     body?: unknown,
     options?: RequestOptions
-  ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: this.buildHeaders(options),
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+  ): Promise<ApiResponse<T>> {
+    const meta = { path, method };
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: this.buildHeaders(options),
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (error) {
+      return ApiResponse.fail<T>(
+        "0",
+        error instanceof Error ? error.message : "Network error",
+        [error instanceof Error ? error.message : String(error)],
+        meta
+      );
+    }
 
     if (response.status === 204) {
-      return undefined as T;
+      return ApiResponse.ok<T>(null, 204, undefined, meta);
     }
 
     const text = await response.text();
-    const parsed = text ? HttpClient.tryParseJson(text) : undefined;
+    const parsed = text ? HttpClient.tryParseJson(text) : null;
 
     if (!response.ok) {
-      throw new ApiError(response.status, parsed ?? text);
+      const { message, errorDetails } = parseErrorBody(
+        parsed ?? text,
+        response.status
+      );
+      return ApiResponse.fail<T>(response.status, message, errorDetails, {
+        ...meta,
+        data: (parsed as T) ?? null,
+      });
     }
 
-    return parsed as T;
+    return ApiResponse.ok<T>(
+      (parsed as T) ?? null,
+      response.status,
+      undefined,
+      meta
+    );
   }
 
   private static tryParseJson(text: string): unknown {
@@ -167,3 +218,5 @@ export default class HttpClient {
     }
   }
 }
+
+export { ApiResponse, mapData, passData, parseErrorBody } from "./api_response";

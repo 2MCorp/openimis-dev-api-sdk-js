@@ -1,4 +1,4 @@
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import { buildQuery } from "../healthfacility/types";
 import {
   HealthFacilityAnalyticsResponse,
@@ -16,11 +16,13 @@ class DashboardAnalyticsClient {
    */
   async policyHolder(
     params: DashboardQueryParams = new DashboardQueryParams()
-  ): Promise<PolicyHolderAnalyticsResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  ): Promise<ApiResponse<PolicyHolderAnalyticsResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/analytics/policy-holder/${buildQuery(params.toQuery())}`
     );
-    return PolicyHolderAnalyticsResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      PolicyHolderAnalyticsResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   /**
@@ -29,11 +31,13 @@ class DashboardAnalyticsClient {
    */
   async healthFacility(
     params: DashboardQueryParams = new DashboardQueryParams()
-  ): Promise<HealthFacilityAnalyticsResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  ): Promise<ApiResponse<HealthFacilityAnalyticsResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/analytics/health-facility/${buildQuery(params.toQuery())}`
     );
-    return HealthFacilityAnalyticsResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      HealthFacilityAnalyticsResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   /**
@@ -42,11 +46,13 @@ class DashboardAnalyticsClient {
    */
   async system(
     params: DashboardQueryParams = new DashboardQueryParams()
-  ): Promise<SystemAnalyticsResponse> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  ): Promise<ApiResponse<SystemAnalyticsResponse>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${DASHBOARD_BASE_PATH}/analytics/system/${buildQuery(params.toQuery())}`
     );
-    return SystemAnalyticsResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      SystemAnalyticsResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 }
 

@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import EmployeeInsurancePlanFhirConverter from "../fhir_converter/insurance_plan";
 import { EmployeeInsurancePlanModel } from "../models/insurance_plan";
 import { FhirSearchPage } from "../models/pagination";
@@ -19,19 +19,21 @@ class FormalSectorInsurancePlansClient {
 
   async list(
     filters: InsurancePlanListFilters = new InsurancePlanListFilters()
-  ): Promise<FhirSearchPage<EmployeeInsurancePlanModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<EmployeeInsurancePlanModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/insurance-plans/${buildQuery(filters.toQuery())}`
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 
-  async get(pk: string): Promise<EmployeeInsurancePlanModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(pk: string): Promise<ApiResponse<EmployeeInsurancePlanModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/insurance-plans/${encodeURIComponent(pk)}/`
     );
-    return this.converter.fromFhir(
-      asFhirResource<fhir4.InsurancePlan>(data)
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.InsurancePlan>(data))
     );
   }
 }

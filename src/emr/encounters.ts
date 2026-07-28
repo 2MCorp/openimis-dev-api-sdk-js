@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import ClaimFhirConverter from "../fhir_converter/claims";
 import { ClaimModel } from "../models/claim";
 import { FhirSearchPage } from "../models/pagination";
@@ -24,60 +24,72 @@ class EmrEncountersClient {
 
   async list(
     filters: EncounterListFilters = new EncounterListFilters()
-  ): Promise<FhirSearchPage<ClaimModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<ClaimModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${EMR_BASE_PATH}/encounters/${buildQuery(filters.toQuery())}`
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 
-  async get(identifier: string): Promise<ClaimModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(identifier: string): Promise<ApiResponse<ClaimModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${EMR_BASE_PATH}/encounters/${encodeURIComponent(identifier)}/`
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Claim>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
   }
 
-  async create(encounter: ClaimModel): Promise<ClaimModel> {
+  async create(encounter: ClaimModel): Promise<ApiResponse<ClaimModel>> {
     const payload = this.converter.toFhir(encounter);
     payload.type = { coding: [{ code: "C", display: "Encounter" }] };
-    const data = await this.httpClient.post<unknown>(
+    const response = await this.httpClient.post<unknown>(
       `${EMR_BASE_PATH}/encounters/`,
       payload
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Claim>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
   }
 
   async update(
     identifier: string,
     encounter: ClaimModel
-  ): Promise<ClaimModel> {
-    const data = await this.httpClient.put<unknown>(
+  ): Promise<ApiResponse<ClaimModel>> {
+    const response = await this.httpClient.put<unknown>(
       `${EMR_BASE_PATH}/encounters/${encodeURIComponent(identifier)}/`,
       this.converter.toFhir(encounter)
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Claim>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
   }
 
   async patch(
     identifier: string,
     encounter: ClaimModel
-  ): Promise<ClaimModel> {
-    const data = await this.httpClient.patch<unknown>(
+  ): Promise<ApiResponse<ClaimModel>> {
+    const response = await this.httpClient.patch<unknown>(
       `${EMR_BASE_PATH}/encounters/${encodeURIComponent(identifier)}/`,
       this.converter.toFhir(encounter)
     );
-    return this.converter.fromFhir(asFhirResource<fhir4.Claim>(data));
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
   }
 
   /** POST encounters/$bulk-submit/ */
-  async bulkSubmit(encounters: ClaimModel[]): Promise<SubmitOperationResponse> {
+  async bulkSubmit(encounters: ClaimModel[]): Promise<ApiResponse<SubmitOperationResponse>> {
     const bundle = this.converter.toCollectionBundle(encounters);
-    const data = await this.httpClient.post<Record<string, unknown>>(
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${EMR_BASE_PATH}/encounters/$bulk-submit/`,
       bundle
     );
-    return SubmitOperationResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      SubmitOperationResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 }
 

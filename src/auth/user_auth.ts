@@ -1,4 +1,4 @@
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData, passData } from "../types";
 import {
   AuthTokenResponse,
   LoginCredentials,
@@ -19,72 +19,88 @@ class UserAuthAPIClient {
   async login(
     credentials: LoginCredentials,
     options: { persistToken?: boolean } = {}
-  ): Promise<AuthTokenResponse> {
+  ): Promise<ApiResponse<AuthTokenResponse>> {
     const { persistToken = true } = options;
-    const data = await this.httpClient.post<Record<string, unknown>>(
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${BASE_PATH}/login/`,
       credentials.toJSON(),
       { skipAuth: true }
     );
 
-    const response = AuthTokenResponse.fromJSON(data);
+    const mapped = mapData(response, (data) =>
+      AuthTokenResponse.fromJSON(data as Record<string, unknown>)
+    );
 
-    if (persistToken && response.token) {
+    if (mapped.success && persistToken && mapped.data?.token) {
       this.httpClient.setAuthScheme("Token");
-      this.httpClient.setToken(response.token);
+      this.httpClient.setToken(mapped.data.token);
     }
 
-    return response;
+    return mapped;
   }
 
-  async logout(): Promise<void> {
-    await this.httpClient.post<void>(`${BASE_PATH}/logout/`);
-    this.httpClient.setToken(undefined);
+  async logout(): Promise<ApiResponse<null>> {
+    const response = await this.httpClient.post<void>(`${BASE_PATH}/logout/`);
+    if (response.success) {
+      this.httpClient.setToken(undefined);
+    }
+    return passData<null>(response);
   }
 
-  async logoutAll(): Promise<void> {
-    await this.httpClient.post<void>(`${BASE_PATH}/logout-all/`);
-    this.httpClient.setToken(undefined);
+  async logoutAll(): Promise<ApiResponse<null>> {
+    const response = await this.httpClient.post<void>(`${BASE_PATH}/logout-all/`);
+    if (response.success) {
+      this.httpClient.setToken(undefined);
+    }
+    return passData<null>(response);
   }
 
-  async getUser(): Promise<UserInfo> {
-    const data = await this.httpClient.get<Record<string, unknown>>(
+  async getUser(): Promise<ApiResponse<UserInfo>> {
+    const response = await this.httpClient.get<Record<string, unknown>>(
       `${BASE_PATH}/user/`
     );
-    return UserInfo.fromJSON(data);
+    return mapData(response, (data) =>
+      UserInfo.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   async requestPasswordReset(
     request: PasswordResetRequest
-  ): Promise<PasswordResetRequestResponse> {
-    const data = await this.httpClient.post<Record<string, unknown>>(
+  ): Promise<ApiResponse<PasswordResetRequestResponse>> {
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${BASE_PATH}/password-reset/request/`,
       request.toJSON(),
       { skipAuth: true }
     );
-    return PasswordResetRequestResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      PasswordResetRequestResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   async verifyPasswordResetOtp(
     request: VerifyOtpRequest
-  ): Promise<VerifyOtpResponse> {
-    const data = await this.httpClient.post<Record<string, unknown>>(
+  ): Promise<ApiResponse<VerifyOtpResponse>> {
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${BASE_PATH}/password-reset/verify/`,
       request.toJSON(),
       { skipAuth: true }
     );
-    return VerifyOtpResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      VerifyOtpResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   async confirmPasswordReset(
     request: PasswordResetConfirmRequest
-  ): Promise<PasswordResetConfirmResponse> {
-    const data = await this.httpClient.post<Record<string, unknown>>(
+  ): Promise<ApiResponse<PasswordResetConfirmResponse>> {
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${BASE_PATH}/password-reset/confirm/`,
       request.toJSON(),
       { skipAuth: true }
     );
-    return PasswordResetConfirmResponse.fromJSON(data);
+    return mapData(response, (data) =>
+      PasswordResetConfirmResponse.fromJSON(data as Record<string, unknown>)
+    );
   }
 
   /**
@@ -92,20 +108,22 @@ class UserAuthAPIClient {
    */
   async refreshToken(
     options: { persistToken?: boolean } = {}
-  ): Promise<AuthTokenResponse> {
+  ): Promise<ApiResponse<AuthTokenResponse>> {
     const { persistToken = true } = options;
-    const data = await this.httpClient.post<Record<string, unknown>>(
+    const response = await this.httpClient.post<Record<string, unknown>>(
       `${BASE_PATH}/refresh-token/`
     );
 
-    const response = AuthTokenResponse.fromJSON(data);
+    const mapped = mapData(response, (data) =>
+      AuthTokenResponse.fromJSON(data as Record<string, unknown>)
+    );
 
-    if (persistToken && response.token) {
+    if (mapped.success && persistToken && mapped.data?.token) {
       this.httpClient.setAuthScheme("Token");
-      this.httpClient.setToken(response.token);
+      this.httpClient.setToken(mapped.data.token);
     }
 
-    return response;
+    return mapped;
   }
 }
 

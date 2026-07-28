@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import StaffFhirConverter from "../fhir_converter/staff";
 import { StaffModel } from "../models/staff";
 import { FhirSearchPage } from "../models/pagination";
@@ -19,19 +19,21 @@ class FormalSectorStaffsClient {
 
   async list(
     params: FhirListParams = new FhirListParams()
-  ): Promise<FhirSearchPage<StaffModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<StaffModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/staffs/${buildQuery(params.toQuery())}`
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 
-  async get(pk: string): Promise<StaffModel> {
-    const data = await this.httpClient.get<unknown>(
+  async get(pk: string): Promise<ApiResponse<StaffModel>> {
+    const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/staffs/${encodeURIComponent(pk)}/`
     );
-    return this.converter.fromFhir(
-      asFhirResource<fhir4.OrganizationAffiliation>(data)
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.OrganizationAffiliation>(data))
     );
   }
 }

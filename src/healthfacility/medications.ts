@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import HttpClient from "../types";
+import HttpClient, { ApiResponse, mapData } from "../types";
 import MedicationFhirConverter from "../fhir_converter/medication";
 import { MedicationItemModel } from "../models/medication";
 import { FhirSearchPage } from "../models/pagination";
@@ -19,12 +19,14 @@ class HealthFacilityMedicationsClient {
   /** Public catalog list. */
   async list(
     params: FhirListParams = new FhirListParams()
-  ): Promise<FhirSearchPage<MedicationItemModel>> {
-    const data = await this.httpClient.get<unknown>(
+  ): Promise<ApiResponse<FhirSearchPage<MedicationItemModel>>> {
+    const response = await this.httpClient.get<unknown>(
       `${HF_BASE_PATH}/medications/${buildQuery(params.toQuery())}`,
       { skipAuth: true }
     );
-    return this.converter.fromSearchBundle(asFhirBundle(data));
+    return mapData(response, (data) =>
+      this.converter.fromSearchBundle(asFhirBundle(data))
+    );
   }
 }
 
