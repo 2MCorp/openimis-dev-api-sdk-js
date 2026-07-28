@@ -12,7 +12,8 @@
     "build": "pnpm run clean && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pack": "pnpm run build && pnpm pack",
-    "test": "echo \"No tests configured\""
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
