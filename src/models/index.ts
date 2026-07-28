@@ -5,6 +5,7 @@ export {
   ClaimDiagnosisModel,
   ClaimAttachmentModel,
 } from "./claim";
+export { ClaimChargeItemModel } from "./claim_charge_item";
 export { EmployeeModel } from "./employee";
 export {
   HealthFacilityModel,
