@@ -11,10 +11,25 @@ The SDK wraps FHIR-backed plugin endpoints and returns UI-friendly model classes
 
 ## Install
 
+Install from GitHub (this package is not published to the npm registry). A `prepare` script compiles TypeScript on install:
+
 ```bash
-pnpm add openimis-dev-api-sdk-js
-# or: npm install openimis-dev-api-sdk-js
-# or: yarn add openimis-dev-api-sdk-js
+pnpm add github:2MCorp/openimis-dev-api-sdk-js
+# or: npm install github:2MCorp/openimis-dev-api-sdk-js
+# or: yarn add github:2MCorp/openimis-dev-api-sdk-js
+```
+
+SSH (private clones / org access):
+
+```bash
+pnpm add git+ssh://git@github.com/2MCorp/openimis-dev-api-sdk-js.git
+```
+
+Pin a branch, tag, or commit:
+
+```bash
+pnpm add github:2MCorp/openimis-dev-api-sdk-js#main
+pnpm add github:2MCorp/openimis-dev-api-sdk-js#v1.0.0
 ```
 
 ## Quick start

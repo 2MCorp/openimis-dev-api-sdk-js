@@ -12,6 +12,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "build": "pnpm run clean && tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "pack": "pnpm run build && pnpm pack",
     "test": "vitest run",
