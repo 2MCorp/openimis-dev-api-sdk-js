@@ -1,3 +1,15 @@
+/**
+ * Health Facility API key credentials for EMR / Api-Key flows.
+ * `apiKey` is the full key string (`prefix.secret`).
+ */
+export class HealthFacilityApiKeyCredentials {
+  constructor(
+    public readonly apiKey: string,
+    /** Optional; sent as `X-Claim-Admin-Code` on subsequent requests. */
+    public readonly claimAdminCode?: string
+  ) {}
+}
+
 /** Matches backend password-reset user_type choices. */
 export enum UserType {
   Technical = 1,

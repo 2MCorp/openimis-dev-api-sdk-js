@@ -6,6 +6,11 @@ export interface HttpClientOptions {
   authScheme?: AuthScheme;
   /** Required for multi-org policy-holder users. Sent as `PolicyHolder-Code`. */
   policyHolderCode?: string;
+  /**
+   * EMR write operations. Sent as `X-Claim-Admin-Code`.
+   * Falls back to plugin `default_claim_admin_code` on the server when omitted.
+   */
+  claimAdminCode?: string;
 }
 
 export interface RequestOptions {
@@ -45,6 +50,7 @@ export default class HttpClient {
   private token?: string;
   private authScheme: AuthScheme;
   private policyHolderCode?: string;
+  private claimAdminCode?: string;
 
   constructor(
     private readonly baseUrl: string,
@@ -53,6 +59,7 @@ export default class HttpClient {
     this.token = options.token;
     this.authScheme = options.authScheme ?? "Token";
     this.policyHolderCode = options.policyHolderCode;
+    this.claimAdminCode = options.claimAdminCode;
   }
 
   getToken(): string | undefined {
@@ -63,12 +70,24 @@ export default class HttpClient {
     this.token = token;
   }
 
+  getAuthScheme(): AuthScheme {
+    return this.authScheme;
+  }
+
   setAuthScheme(authScheme: AuthScheme): void {
     this.authScheme = authScheme;
   }
 
   setPolicyHolderCode(policyHolderCode: string | undefined): void {
     this.policyHolderCode = policyHolderCode;
+  }
+
+  getClaimAdminCode(): string | undefined {
+    return this.claimAdminCode;
+  }
+
+  setClaimAdminCode(claimAdminCode: string | undefined): void {
+    this.claimAdminCode = claimAdminCode;
   }
 
   get<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -104,6 +123,10 @@ export default class HttpClient {
 
       if (this.policyHolderCode) {
         headers["PolicyHolder-Code"] = this.policyHolderCode;
+      }
+
+      if (this.claimAdminCode) {
+        headers["X-Claim-Admin-Code"] = this.claimAdminCode;
       }
     }
 
