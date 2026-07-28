@@ -19,8 +19,7 @@
   "license": "ISC",
   "packageManager": "pnpm@10.32.1",
   "dependencies": {
-    "@types/fhir": "^0.0.44",
-    "fhir-tool": "^5.0.2"
+    "@types/fhir": "^0.0.44"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
