@@ -10,22 +10,20 @@ class HealthFacilityPatientsClient {
 
   constructor(private readonly httpClient: HttpClient) {}
 
-  /** Public endpoint: GET search-patient/?identifier={chfId} */
+  /** GET search-patient/?identifier={chfId} — sends Knox token when configured. */
   async getByChfId(chfId: string): Promise<ApiResponse<PatientModel>> {
     const response = await this.httpClient.get<unknown>(
-      `${HF_BASE_PATH}/search-patient/${buildQuery({ identifier: chfId })}`,
-      { skipAuth: true }
+      `${HF_BASE_PATH}/search-patient/${buildQuery({ identifier: chfId })}`
     );
     return mapData(response, (data) =>
       this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
     );
   }
 
-  /** Public endpoint: GET search-patient/{identifier}/ */
+  /** GET search-patient/{identifier}/ — sends Knox token when configured. */
   async getByIdentifier(identifier: string): Promise<ApiResponse<PatientModel>> {
     const response = await this.httpClient.get<unknown>(
-      `${HF_BASE_PATH}/search-patient/${encodeURIComponent(identifier)}/`,
-      { skipAuth: true }
+      `${HF_BASE_PATH}/search-patient/${encodeURIComponent(identifier)}/`
     );
     return mapData(response, (data) =>
       this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))

@@ -72,6 +72,7 @@ OpenIMISDevApiSdk
 ├── healthFacility    /health-facility-dev-api/
 ├── formalSector      /policy-holder-dev-api/
 ├── dashboard         /dashboard/ (metrics + analytics)
+├── eventBus          /event-bus/ (SSE live updates)
 └── fhir              FHIR ↔ model converters
 ```
 
@@ -198,6 +199,33 @@ const any = sdk.fhir.fromUnknownResource(resource); // dispatches by resourceTyp
 ## Models & errors
 
 Domain models (`PatientModel`, `ClaimModel`, `EmployeeModel`, …) and auth/dashboard types are exported from the package root.
+
+### Event bus (SSE)
+
+Live HF / PH notifications over Server-Sent Events. Paths and payload parsing live in the SDK so every consumer (portal, Node, mobile) shares the same business logic.
+
+```ts
+import {
+  OpenIMISDevApiSdk,
+  HttpClient,
+  parseHfClaimLifecycleData,
+  HF_UPDATE_SSE_PATH,
+} from "openimis-dev-api-sdk-js";
+
+const http = new HttpClient({ baseUrl: "https://api.example.com/api/developer_api" });
+http.setAuthToken(knoxToken);
+const sdk = new OpenIMISDevApiSdk(http);
+
+const sub = sdk.eventBus.subscribeHealthFacilityUpdates({
+  onNotification: (n) => {
+    // n.message, n.claimCode, n.claimId, …
+  },
+  onError: console.error,
+});
+// later: sub.close();
+```
+
+Browsers that cannot send `Authorization` on `EventSource` should proxy SSE same-origin and still use SDK parsers (`parseHfClaimLifecycleData`, `parseHfMutationData`) and path constants (`HF_UPDATE_SSE_PATH`, …).
 
 Failed HTTP responses throw `ApiError`:
 

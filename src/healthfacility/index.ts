@@ -11,6 +11,9 @@ import HealthFacilityServicesClient from "./services";
 import HealthFacilityDiagnosesClient from "./diagnoses";
 import HealthFacilityFacilitiesClient from "./facilities";
 import HealthFacilityPatientReferencesClient from "./patient_references";
+import HealthFacilityStaffsClient from "./staffs";
+import HealthFacilityClientConfigClient from "./client_config";
+import HealthFacilityBulkClient from "./bulk";
 
 /**
  * Client for `/health-facility-dev-api/` plugin endpoints.
@@ -28,24 +31,32 @@ class HealthFacilityDevAPIClient {
   public readonly diagnoses: HealthFacilityDiagnosesClient;
   public readonly facilities: HealthFacilityFacilitiesClient;
   public readonly patientReferences: HealthFacilityPatientReferencesClient;
+  public readonly staffs: HealthFacilityStaffsClient;
+  public readonly clientConfig: HealthFacilityClientConfigClient;
+  public readonly bulk: HealthFacilityBulkClient;
 
   constructor(httpClient: HttpClient) {
     this.patients = new HealthFacilityPatientsClient(httpClient);
     this.claims = new HealthFacilityClaimsClient(httpClient);
     this.claimItems = new HealthFacilityClaimItemsClient(httpClient);
     this.claimServices = new HealthFacilityClaimServicesClient(httpClient);
-    this.claimAttachments = new HealthFacilityClaimAttachmentsClient(httpClient);
+    this.claimAttachments = new HealthFacilityClaimAttachmentsClient(
+      httpClient,
+    );
     this.encounters = new HealthFacilityEncountersClient(httpClient);
     this.preauthorizations = new HealthFacilityPreauthorizationsClient(
-      httpClient
+      httpClient,
     );
     this.medications = new HealthFacilityMedicationsClient(httpClient);
     this.services = new HealthFacilityServicesClient(httpClient);
     this.diagnoses = new HealthFacilityDiagnosesClient(httpClient);
     this.facilities = new HealthFacilityFacilitiesClient(httpClient);
     this.patientReferences = new HealthFacilityPatientReferencesClient(
-      httpClient
+      httpClient,
     );
+    this.staffs = new HealthFacilityStaffsClient(httpClient);
+    this.clientConfig = new HealthFacilityClientConfigClient(httpClient);
+    this.bulk = new HealthFacilityBulkClient(httpClient);
   }
 }
 
@@ -63,5 +74,13 @@ export {
   HealthFacilityDiagnosesClient,
   HealthFacilityFacilitiesClient,
   HealthFacilityPatientReferencesClient,
+  HealthFacilityStaffsClient,
+  HealthFacilityClientConfigClient,
+  HealthFacilityBulkClient,
 };
 export * from "./types";
+export type {
+  HfClientConfig,
+  HfClaimFormConfig,
+  HfMoneyConfig,
+} from "./client_config";

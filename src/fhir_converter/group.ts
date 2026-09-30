@@ -19,13 +19,22 @@ import {
 function membersFromGroup(resource: fhir4.Group): GroupMemberModel[] {
   return (resource.member ?? []).map((member) => {
     const entity = member.entity;
-    return new GroupMemberModel(
-      referenceId(entity) ?? entity?.identifier?.value ?? "",
-      entity?.display,
-      entity?.identifier?.system?.includes("4122")
-        ? entity.identifier.value
-        : undefined
+
+    // Extract CHFID from the identifier field (primary identifier)
+    // The backend now sets this with type_code="chfid"
+    const chfId =
+      entity?.identifier?.value ??
+      (entity?.reference
+        ? entity.reference.split("/").pop() || entity.reference
+        : "");
+
+    // Extract UUID from extension
+    const uuidExtension = entity?.extension?.find((ext) =>
+      ext.url?.includes("insuree-uuid"),
     );
+    const insureeUuid = uuidExtension?.valueString;
+
+    return new GroupMemberModel(chfId, entity?.display, insureeUuid);
   });
 }
 
@@ -36,7 +45,7 @@ class FamilyGroupFhirConverter {
     assertResourceType(resource, "Group");
     const locationExt = getExtension(
       resource.extension,
-      "address-location-reference"
+      "address-location-reference",
     );
     return new FamilyGroupModel(
       resource.id ?? "",
@@ -52,13 +61,13 @@ class FamilyGroupFhirConverter {
       getExtensionBoolean(resource.extension, "group-poverty-status"),
       getExtensionString(resource.extension, "group-type"),
       getExtensionString(resource.extension, "group-address"),
-      referenceId(locationExt?.valueReference)
+      referenceId(locationExt?.valueReference),
     );
   }
 
   fromBundle(bundle: fhir4.Bundle): FamilyGroupModel[] {
     return resourcesFromBundle<fhir4.Group>(bundle, "Group").map((group) =>
-      this.fromFhir(group)
+      this.fromFhir(group),
     );
   }
 
@@ -103,13 +112,13 @@ class EmployeeGroupFhirConverter {
         systemIncludes: "4122",
       }) ?? getUuidIdentifier(resource.identifier),
       "definitional",
-      membersFromGroup(resource)
+      membersFromGroup(resource),
     );
   }
 
   fromBundle(bundle: fhir4.Bundle): EmployeeGroupModel[] {
     return resourcesFromBundle<fhir4.Group>(bundle, "Group").map((group) =>
-      this.fromFhir(group)
+      this.fromFhir(group),
     );
   }
 

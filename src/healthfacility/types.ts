@@ -9,8 +9,13 @@ export class FhirListParams {
   ) {}
 
   toQuery(): Record<string, string | number | boolean | undefined> {
+    // OpenIMIS FHIR uses PageNumberPagination with page_query_param="page-offset"
+    // (1-based page number). Values < 1 are invalid and must be omitted.
     return {
-      "page-offset": this.pageOffset,
+      "page-offset":
+        this.pageOffset != null && this.pageOffset >= 1
+          ? this.pageOffset
+          : undefined,
       _count: this.count,
     };
   }
@@ -21,6 +26,7 @@ export class ClaimListFilters extends FhirListParams {
     pageOffset?: number,
     count?: number,
     public identifier?: string,
+    /** Inclusive start date (`YYYY-MM-DD`). Sent as ``dateFrom`` (``refDate`` kept for compat). */
     public refDate?: string,
     public patient?: string,
     public patientChfid?: string,
@@ -31,7 +37,9 @@ export class ClaimListFilters extends FhirListParams {
       | "processed"
       | "valuated"
       | string,
-    public contained?: boolean
+    public contained?: boolean,
+    /** Inclusive end date (`YYYY-MM-DD`). */
+    public dateTo?: string
   ) {
     super(pageOffset, count);
   }
@@ -40,7 +48,9 @@ export class ClaimListFilters extends FhirListParams {
     return {
       ...super.toQuery(),
       identifier: this.identifier,
+      dateFrom: this.refDate,
       refDate: this.refDate,
+      dateTo: this.dateTo,
       patient: this.patient,
       patientChfid: this.patientChfid,
       status: this.status,
@@ -59,7 +69,8 @@ export class EncounterListFilters extends ClaimListFilters {
     patientChfid?: string,
     status?: string,
     contained?: boolean,
-    public primaryDiagnosisCode?: string
+    public primaryDiagnosisCode?: string,
+    dateTo?: string
   ) {
     super(
       pageOffset,
@@ -69,7 +80,8 @@ export class EncounterListFilters extends ClaimListFilters {
       patient,
       patientChfid,
       status,
-      contained
+      contained,
+      dateTo
     );
   }
 
@@ -91,7 +103,8 @@ export class PreauthorizationListFilters extends FhirListParams {
     public patientCHFID?: string,
     public refDate?: string,
     public status?: "entered" | "approved" | "rejected" | string,
-    public contained?: boolean
+    public contained?: boolean,
+    public dateTo?: string
   ) {
     super(pageOffset, count);
   }
@@ -103,7 +116,9 @@ export class PreauthorizationListFilters extends FhirListParams {
       order_by: this.orderBy,
       patient: this.patient,
       patientCHFID: this.patientCHFID,
+      dateFrom: this.refDate,
       refDate: this.refDate,
+      dateTo: this.dateTo,
       status: this.status,
       contained: this.contained ? "true" : undefined,
     };

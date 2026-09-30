@@ -22,6 +22,7 @@ import {
 } from "./payment";
 import PreauthorizationFhirConverter from "./preauthorization";
 import StaffFhirConverter from "./staff";
+import HfStaffFhirConverter from "./hf_staff";
 import { resourcesFromBundle } from "./helpers";
 import {
   EMPLOYEE_UUID_SYSTEM,
@@ -54,7 +55,10 @@ class FhirConverter {
   public readonly paymentReconciliation =
     new PaymentReconciliationFhirConverter();
   public readonly coverage = new CoverageFhirConverter();
+  /** Policy-holder staff (OrganizationAffiliation). */
   public readonly staff = new StaffFhirConverter();
+  /** Health-facility portal staff (PractitionerRole). */
+  public readonly hfStaff = new HfStaffFhirConverter();
   public readonly binary = new BinaryFhirConverter();
 
   fromUnknownResource(
@@ -99,6 +103,8 @@ class FhirConverter {
         return this.coverage.fromFhir(resource as fhir4.Coverage);
       case "OrganizationAffiliation":
         return this.staff.fromFhir(resource as fhir4.OrganizationAffiliation);
+      case "PractitionerRole":
+        return this.hfStaff.fromFhir(resource as fhir4.PractitionerRole);
       case "Binary":
         return this.binary.fromFhir(resource as fhir4.Binary);
       case "CodeSystem":
@@ -154,6 +160,7 @@ export { EmployeeInsurancePlanFhirConverter };
 export { PaymentNoticeFhirConverter, PaymentReconciliationFhirConverter };
 export { CoverageFhirConverter };
 export { StaffFhirConverter };
+export { HfStaffFhirConverter };
 export { BinaryFhirConverter };
 export { default as BaseFhirConverter } from "./base";
 export * from "./constants";

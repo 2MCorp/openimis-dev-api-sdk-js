@@ -1,3 +1,13 @@
+export type PatientContact = {
+  lastName?: string;
+  otherNames?: string;
+  relationshipId?: string;
+  relationshipDisplay?: string;
+  phone?: string;
+  email?: string;
+  gender?: string;
+};
+
 export class PatientModel {
   constructor(
     public id: string,
@@ -33,7 +43,8 @@ export class PatientModel {
     public photoTitle?: string,
     public photoContentType?: string,
     public photoCreation?: string,
-    public photoData?: string
+    public photoData?: string,
+    public contacts: PatientContact[] = []
   ) {}
 
   get fullName(): string {

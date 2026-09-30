@@ -2,7 +2,11 @@
 
 import HttpClient, { ApiResponse, mapData } from "../types";
 import StaffFhirConverter from "../fhir_converter/staff";
-import { StaffModel } from "../models/staff";
+import {
+  CreateStaffPayload,
+  StaffModel,
+  UpdateStaffPayload,
+} from "../models/staff";
 import { FhirSearchPage } from "../models/pagination";
 import {
   FhirListParams,
@@ -31,6 +35,39 @@ class FormalSectorStaffsClient {
   async get(pk: string): Promise<ApiResponse<StaffModel>> {
     const response = await this.httpClient.get<unknown>(
       `${PH_BASE_PATH}/staffs/${encodeURIComponent(pk)}/`
+    );
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.OrganizationAffiliation>(data))
+    );
+  }
+
+  /**
+   * Create PH staff. Request body is portal JSON (not FHIR);
+   * response is FHIR OrganizationAffiliation.
+   */
+  async create(
+    payload: CreateStaffPayload
+  ): Promise<ApiResponse<StaffModel>> {
+    const response = await this.httpClient.post<unknown>(
+      `${PH_BASE_PATH}/staffs/`,
+      payload
+    );
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.OrganizationAffiliation>(data))
+    );
+  }
+
+  /**
+   * Partial update (deactivate / role). Request body is portal JSON;
+   * response is FHIR OrganizationAffiliation.
+   */
+  async update(
+    pk: string,
+    payload: UpdateStaffPayload
+  ): Promise<ApiResponse<StaffModel>> {
+    const response = await this.httpClient.patch<unknown>(
+      `${PH_BASE_PATH}/staffs/${encodeURIComponent(pk)}/`,
+      payload
     );
     return mapData(response, (data) =>
       this.converter.fromFhir(asFhirResource<fhir4.OrganizationAffiliation>(data))

@@ -33,7 +33,7 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly body: unknown,
-    message?: string
+    message?: string,
   ) {
     super(message ?? ApiError.messageFromBody(status, body));
     this.name = "ApiError";
@@ -50,7 +50,7 @@ export class ApiError extends Error {
         detail: response.message,
         error_details: response.errorDetails,
       },
-      response.message
+      response.message,
     );
   }
 }
@@ -63,7 +63,7 @@ export default class HttpClient {
 
   constructor(
     private readonly baseUrl: string,
-    options: HttpClientOptions = {}
+    options: HttpClientOptions = {},
   ) {
     this.token = options.token;
     this.authScheme = options.authScheme ?? "Token";
@@ -101,7 +101,7 @@ export default class HttpClient {
 
   get<T = unknown>(
     path: string,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     return this.request<T>("GET", path, undefined, options);
   }
@@ -109,7 +109,7 @@ export default class HttpClient {
   post<T = unknown>(
     path: string,
     body?: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     return this.request<T>("POST", path, body, options);
   }
@@ -117,7 +117,7 @@ export default class HttpClient {
   put<T = unknown>(
     path: string,
     body?: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     return this.request<T>("PUT", path, body, options);
   }
@@ -125,16 +125,93 @@ export default class HttpClient {
   patch<T = unknown>(
     path: string,
     body?: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     return this.request<T>("PATCH", path, body, options);
   }
 
   delete<T = unknown>(
     path: string,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     return this.request<T>("DELETE", path, undefined, options);
+  }
+
+  /**
+   * POST multipart/form-data (e.g., file uploads).
+   * Content-Type is set automatically by the browser when FormData is used.
+   */
+  async postFormData<T = unknown>(
+    path: string,
+    formData: FormData,
+    options?: RequestOptions,
+  ): Promise<ApiResponse<T>> {
+    const meta = { path, method: "POST" };
+
+    // Build headers WITHOUT Content-Type (browser sets it with boundary)
+    const headers: Record<string, string> = { ...options?.headers };
+
+    if (!options?.skipAuth) {
+      if (this.token) {
+        headers.Authorization = `${this.authScheme} ${this.token}`;
+      }
+      if (this.policyHolderCode) {
+        headers["PolicyHolder-Code"] = this.policyHolderCode;
+      }
+      if (this.claimAdminCode) {
+        headers["X-Claim-Admin-Code"] = this.claimAdminCode;
+      }
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+    } catch (error) {
+      return ApiResponse.fail<T>(
+        "0",
+        error instanceof Error ? error.message : "Network error",
+        [error instanceof Error ? error.message : String(error)],
+        meta,
+      );
+    }
+
+    if (response.status === 204) {
+      return ApiResponse.ok<T>(null, 204, undefined, meta);
+    }
+
+    const text = await response.text();
+    const parsed = text ? HttpClient.tryParseJson(text) : null;
+
+    if (!response.ok) {
+      const { message, errorDetails } = parseErrorBody(
+        parsed ?? text,
+        response.status,
+      );
+      return ApiResponse.fail<T>(response.status, message, errorDetails, {
+        ...meta,
+        data: (parsed as T) ?? null,
+      });
+    }
+
+    return ApiResponse.ok<T>(
+      (parsed as T) ?? null,
+      response.status,
+      undefined,
+      meta,
+    );
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /** Auth + optional org headers for streaming clients (SSE) that bypass `request()`. */
+  getAuthHeaders(options?: RequestOptions): Record<string, string> {
+    return this.buildHeaders({ ...options, headers: { ...options?.headers } });
   }
 
   private buildHeaders(options?: RequestOptions): Record<string, string> {
@@ -164,7 +241,7 @@ export default class HttpClient {
     method: string,
     path: string,
     body?: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<ApiResponse<T>> {
     const meta = { path, method };
 
@@ -180,7 +257,7 @@ export default class HttpClient {
         "0",
         error instanceof Error ? error.message : "Network error",
         [error instanceof Error ? error.message : String(error)],
-        meta
+        meta,
       );
     }
 
@@ -194,7 +271,7 @@ export default class HttpClient {
     if (!response.ok) {
       const { message, errorDetails } = parseErrorBody(
         parsed ?? text,
-        response.status
+        response.status,
       );
       return ApiResponse.fail<T>(response.status, message, errorDetails, {
         ...meta,
@@ -206,7 +283,7 @@ export default class HttpClient {
       (parsed as T) ?? null,
       response.status,
       undefined,
-      meta
+      meta,
     );
   }
 

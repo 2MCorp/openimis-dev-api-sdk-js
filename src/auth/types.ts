@@ -111,7 +111,11 @@ export class UserInfo {
     public readonly lastLogin?: string | null,
     public readonly healthFacility?: HealthFacilityInfo,
     public readonly policyHolder?: PolicyHolderInfo,
-    public readonly policyHolders?: PolicyHolderInfo[]
+    public readonly policyHolders?: PolicyHolderInfo[],
+    /** Mapped from API `email_verified` / `emailVerified`. */
+    public readonly emailVerified?: boolean,
+    public readonly permissions: string[] = [],
+    public readonly groups: string[] = []
   ) {}
 
   static fromJSON(data: Record<string, unknown>): UserInfo {
@@ -137,6 +141,21 @@ export class UserInfo {
         )
       : undefined;
 
+    const emailVerified =
+      typeof data.email_verified === "boolean"
+        ? data.email_verified
+        : typeof data.emailVerified === "boolean"
+          ? data.emailVerified
+          : undefined;
+
+    const permissions = Array.isArray(data.permissions)
+      ? data.permissions.map((item) => String(item))
+      : [];
+
+    const groups = Array.isArray(data.groups)
+      ? data.groups.map((item) => String(item))
+      : [];
+
     return new UserInfo(
       data.id as number | string,
       String(data.username ?? ""),
@@ -149,7 +168,113 @@ export class UserInfo {
       data.last_login != null ? String(data.last_login) : null,
       healthFacility,
       policyHolder,
-      policyHolders
+      policyHolders,
+      emailVerified,
+      permissions,
+      groups
+    );
+  }
+}
+
+export class RegisterPortalUserRequest {
+  constructor(
+    public readonly username: string,
+    public readonly email: string,
+    public readonly password: string
+  ) {}
+
+  toJSON(): { username: string; email: string; password: string } {
+    return {
+      username: this.username,
+      password: this.password,
+      email: this.email,
+    };
+  }
+}
+
+export class RegisterPortalUserResponse {
+  constructor(
+    public readonly id: number | string,
+    public readonly username: string,
+    public readonly email: string,
+    public readonly emailVerified: boolean,
+    public readonly detail?: string
+  ) {}
+
+  static fromJSON(data: Record<string, unknown>): RegisterPortalUserResponse {
+    const emailVerified =
+      typeof data.email_verified === "boolean"
+        ? data.email_verified
+        : typeof data.emailVerified === "boolean"
+          ? data.emailVerified
+          : false;
+    return new RegisterPortalUserResponse(
+      data.id as number | string,
+      String(data.username ?? ""),
+      String(data.email ?? ""),
+      emailVerified,
+      data.detail != null ? String(data.detail) : undefined
+    );
+  }
+}
+
+export class VerifyPortalEmailRequest {
+  constructor(
+    public readonly email: string,
+    public readonly otp: string
+  ) {}
+
+  toJSON(): { email: string; otp: string } {
+    return { email: this.email, otp: this.otp };
+  }
+}
+
+export class VerifyPortalEmailResponse {
+  constructor(
+    public readonly detail: string,
+    public readonly emailVerified: boolean
+  ) {}
+
+  static fromJSON(data: Record<string, unknown>): VerifyPortalEmailResponse {
+    const emailVerified =
+      typeof data.email_verified === "boolean"
+        ? data.email_verified
+        : typeof data.emailVerified === "boolean"
+          ? data.emailVerified
+          : true;
+    return new VerifyPortalEmailResponse(
+      String(data.detail ?? ""),
+      emailVerified
+    );
+  }
+}
+
+export class ResendPortalVerificationRequest {
+  constructor(public readonly email: string) {}
+
+  toJSON(): { email: string } {
+    return { email: this.email };
+  }
+}
+
+export class ResendPortalVerificationResponse {
+  constructor(
+    public readonly detail: string,
+    public readonly email: string,
+    public readonly otpChannel?: string
+  ) {}
+
+  static fromJSON(
+    data: Record<string, unknown>
+  ): ResendPortalVerificationResponse {
+    return new ResendPortalVerificationResponse(
+      String(data.detail ?? ""),
+      String(data.email ?? ""),
+      data.otp_channel != null
+        ? String(data.otp_channel)
+        : data.otpChannel != null
+          ? String(data.otpChannel)
+          : undefined
     );
   }
 }

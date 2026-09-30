@@ -24,6 +24,9 @@ export class PreauthorizationModel {
     public service?: DiagnosisCode,
     public item?: DiagnosisCode,
     public rejectionReason?: string,
-    public explanation?: string
+    public explanation?: string,
+    /** UUID (preferred) or id of the claim created on approval. */
+    public claimId?: string,
+    public claimCode?: string
   ) {}
 }

@@ -30,12 +30,15 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
       getUuidIdentifier(identifiers, OPENIMIS_IDENTIFIER_SYSTEM) ??
       getUuidIdentifier(identifiers) ??
       (isUuid(resource.id) ? resource.id : undefined);
+    // Backend may emit claim-code type as "MR" (R4 cfg) or "Code" (R5 default).
     const code =
       getIdentifierValue(identifiers, {
         system: OPENIMIS_IDENTIFIER_SYSTEM,
         preferNonUuid: true,
       }) ??
       getIdentifierValue(identifiers, { typeCode: "MR" }) ??
+      getIdentifierValue(identifiers, { typeCode: "Code" }) ??
+      getIdentifierValue(identifiers, { preferNonUuid: true }) ??
       (!isUuid(resource.id) ? resource.id : undefined) ??
       "";
 
@@ -53,12 +56,20 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
         extension.url.includes("claim-item-reference")
       )?.valueReference?.reference;
 
+      const productCode =
+        item.productOrService?.coding?.[0]?.code ??
+        item.productOrService?.text ??
+        "";
+      const category =
+        item.category?.text ??
+        item.category?.coding?.[0]?.code ??
+        item.category?.coding?.[0]?.display ??
+        "";
+
       return new ClaimItemModel(
         item.sequence ?? index + 1,
-        item.productOrService?.text ??
-          item.productOrService?.coding?.[0]?.code ??
-          "",
-        item.category?.text ?? "",
+        productCode,
+        category,
         item.quantity?.value,
         item.unitPrice?.value,
         item.unitPrice?.currency,
@@ -92,8 +103,9 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
       }
     }
 
-    return new ClaimModel(
-      resource.id ?? code ?? uuid ?? "",
+    // Prefer UUID as the resource id so list/submit/detail routes hit UUID retrieve.
+    const model = new ClaimModel(
+      uuid ?? (isUuid(resource.id) ? resource.id! : undefined) ?? code ?? resource.id ?? "",
       code,
       resource.status ?? "",
       referenceId(resource.patient) ?? "",
@@ -113,6 +125,8 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
       items,
       attachments
     );
+    model.patientName = resource.patient?.display?.trim() || undefined;
+    return model;
   }
 
   toFhir(model: ClaimModel): fhir4.Claim {
@@ -166,14 +180,22 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
       });
     }
 
+    const resourceId = [model.id, model.uuid, model.code]
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .find((v) => v.length > 0);
+
     return {
       resourceType: "Claim",
-      id: model.id || model.uuid || model.code,
+      ...(resourceId ? { id: resourceId } : {}),
       status: (model.status || "ENTERED") as fhir4.Claim["status"],
       use: "claim",
       created: model.created ?? new Date().toISOString().slice(0, 10),
       identifier: identifiers.length ? identifiers : undefined,
-      patient: buildReference("Patient", model.patientChfId, model.patientChfId),
+      patient: buildReference(
+        "Patient",
+        model.patientChfId,
+        model.patientName ?? model.patientChfId
+      ),
       type: { coding: [{ code: model.visitType ?? "O" }] },
       priority: {
         coding: [

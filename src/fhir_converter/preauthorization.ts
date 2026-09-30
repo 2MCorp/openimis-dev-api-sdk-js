@@ -7,19 +7,41 @@ import {
   getExtension,
   getExtensionString,
   getIdentifierValue,
+  getUuidIdentifier,
+  isUuid,
   referenceId,
 } from "./helpers";
+
+const EXT_BASE = "http://openimis.org/fhir/StructureDefinition";
 
 function diagnosisFromExt(
   extensions: fhir4.Extension[] | undefined,
   suffix: string
 ): DiagnosisCode | undefined {
-  const coding = getExtension(extensions, suffix)?.valueCodeableConcept
-    ?.coding?.[0];
-  if (!coding?.code) {
-    return undefined;
+  const ext = getExtension(extensions, suffix);
+  if (!ext) return undefined;
+
+  const coding = ext.valueCodeableConcept?.coding?.[0];
+  if (coding?.code) {
+    return new DiagnosisCode(coding.code, coding.display);
   }
-  return new DiagnosisCode(coding.code, coding.display);
+  if (ext.valueString) {
+    return new DiagnosisCode(ext.valueString);
+  }
+  return undefined;
+}
+
+function hfIdFromExt(
+  extensions: fhir4.Extension[] | undefined,
+  suffix: string
+): { id?: string; display?: string } {
+  const ext = getExtension(extensions, suffix);
+  if (!ext) return {};
+  if (ext.valueString) {
+    return { id: ext.valueString, display: ext.valueReference?.display };
+  }
+  const ref = ext.valueReference;
+  return { id: referenceId(ref), display: ref?.display };
 }
 
 class PreauthorizationFhirConverter extends BaseFhirConverter<
@@ -30,23 +52,33 @@ class PreauthorizationFhirConverter extends BaseFhirConverter<
 
   fromFhir(resource: fhir4.Claim): PreauthorizationModel {
     assertResourceType(resource, "Claim");
-    const hfFrom = getExtension(resource.extension, "ref-hf-from")
-      ?.valueReference;
-    const hfTo = getExtension(resource.extension, "ref-hf-to")?.valueReference;
+    const hfFrom = hfIdFromExt(resource.extension, "ref-hf-from");
+    const hfTo = hfIdFromExt(resource.extension, "ref-hf-to");
+
+    const code =
+      getIdentifierValue(resource.identifier, { typeCode: "code" }) ??
+      getIdentifierValue(resource.identifier, {
+        systemIncludes: "preauthorization-code",
+        preferNonUuid: true,
+      }) ??
+      (resource.id && !isUuid(resource.id) ? resource.id : undefined);
+
+    const uuid =
+      getIdentifierValue(resource.identifier, { typeCode: "uuid" }) ??
+      getUuidIdentifier(resource.identifier) ??
+      (resource.id && isUuid(resource.id) ? resource.id : undefined);
 
     return new PreauthorizationModel(
-      resource.id ?? "",
+      code ?? resource.id ?? "",
       resource.status ?? "",
       referenceId(resource.patient) ?? "",
-      getIdentifierValue(resource.identifier, {
-        systemIncludes: "preauthorization",
-      }),
+      uuid,
       resource.created,
       resource.patient?.display,
-      referenceId(hfFrom),
-      hfFrom?.display,
-      referenceId(hfTo),
-      hfTo?.display,
+      hfFrom.id,
+      hfFrom.display,
+      hfTo.id,
+      hfTo.display,
       diagnosisFromExt(resource.extension, "diagnosis-primary"),
       diagnosisFromExt(resource.extension, "diagnosis-secondary") ??
         diagnosisFromExt(resource.extension, "secicd"),
@@ -57,55 +89,51 @@ class PreauthorizationFhirConverter extends BaseFhirConverter<
       diagnosisFromExt(resource.extension, "service"),
       diagnosisFromExt(resource.extension, "item"),
       getExtensionString(resource.extension, "rejection-reason"),
-      getExtensionString(resource.extension, "explanation")
+      getExtensionString(resource.extension, "explanation"),
+      (() => {
+        const linked = getExtension(resource.extension, "linked-claim");
+        return (
+          referenceId(linked?.valueReference) ||
+          linked?.valueString ||
+          undefined
+        );
+      })(),
+      (() => {
+        const linked = getExtension(resource.extension, "linked-claim");
+        return linked?.valueReference?.display || undefined;
+      })()
     );
   }
 
   toFhir(model: PreauthorizationModel): fhir4.Claim {
     const extensions: fhir4.Extension[] = [];
-    const pushCc = (suffix: string, value?: DiagnosisCode) => {
+
+    const pushString = (suffix: string, value?: string) => {
       if (!value) return;
       extensions.push({
-        url: `StructureDefinition/${suffix}`,
-        valueCodeableConcept: {
-          coding: [{ code: value.code, display: value.name }],
-        },
+        url: `${EXT_BASE}/${suffix}`,
+        valueString: value,
       });
     };
-    pushCc("diagnosis-primary", model.primaryDiagnosis);
-    pushCc("diagnosis-secondary", model.secondaryDiagnosis);
-    pushCc("diagnosis-tertiary", model.tertiaryDiagnosis);
-    pushCc("diagnosis-quaternary", model.quaternaryDiagnosis);
-    pushCc("service", model.service);
-    pushCc("item", model.item);
-    if (model.hfFromId) {
+
+    pushString("diagnosis-primary", model.primaryDiagnosis?.code);
+    pushString("diagnosis-secondary", model.secondaryDiagnosis?.code);
+    pushString("diagnosis-tertiary", model.tertiaryDiagnosis?.code);
+    pushString("diagnosis-quaternary", model.quaternaryDiagnosis?.code);
+    pushString("service", model.service?.code);
+    pushString("item", model.item?.code);
+    pushString("ref-hf-from", model.hfFromId);
+    pushString("ref-hf-to", model.hfToId);
+    pushString("rejection-reason", model.rejectionReason);
+    pushString("explanation", model.explanation?.trim() || undefined);
+
+    if (model.claimId) {
       extensions.push({
-        url: "StructureDefinition/ref-hf-from",
+        url: `${EXT_BASE}/linked-claim`,
         valueReference: {
-          reference: `Organization/${model.hfFromId}`,
-          display: model.hfFromDisplay,
+          reference: `Claim/${model.claimId}`,
+          display: model.claimCode,
         },
-      });
-    }
-    if (model.hfToId) {
-      extensions.push({
-        url: "StructureDefinition/ref-hf-to",
-        valueReference: {
-          reference: `Organization/${model.hfToId}`,
-          display: model.hfToDisplay,
-        },
-      });
-    }
-    if (model.rejectionReason) {
-      extensions.push({
-        url: "StructureDefinition/rejection-reason",
-        valueString: model.rejectionReason,
-      });
-    }
-    if (model.explanation) {
-      extensions.push({
-        url: "StructureDefinition/explanation",
-        valueString: model.explanation,
       });
     }
 
@@ -138,14 +166,22 @@ class PreauthorizationFhirConverter extends BaseFhirConverter<
           coverage: { reference: "Coverage/unknown" },
         },
       ],
-      identifier: model.uuid
-        ? [
-            {
-              system: "http://openimis.org/identifiers/preauthorization",
-              value: model.uuid,
-            },
-          ]
-        : undefined,
+      identifier: (() => {
+        const ids: fhir4.Identifier[] = [];
+        if (model.id && !isUuid(model.id)) {
+          ids.push({
+            system: "http://openimis.org/identifiers/preauthorization-code",
+            value: model.id,
+          });
+        }
+        if (model.uuid) {
+          ids.push({
+            system: "http://openimis.org/identifiers/preauthorization",
+            value: model.uuid,
+          });
+        }
+        return ids.length ? ids : undefined;
+      })(),
       extension: extensions.length ? extensions : undefined,
     };
   }

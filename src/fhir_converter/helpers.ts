@@ -231,14 +231,20 @@ export function buildReference(
   id: string,
   display?: string
 ): fhir4.Reference {
+  const trimmedId = (id ?? "").trim();
+  const trimmedDisplay = (display ?? "").trim();
   return {
     type: resourceType,
-    reference: `${resourceType}/${id}`,
-    display,
-    identifier: {
-      system: FACILITY_REFERENCE_SYSTEM,
-      value: id,
-    },
+    ...(trimmedId ? { reference: `${resourceType}/${trimmedId}` } : {}),
+    ...(trimmedDisplay ? { display: trimmedDisplay } : {}),
+    ...(trimmedId
+      ? {
+          identifier: {
+            system: FACILITY_REFERENCE_SYSTEM,
+            value: trimmedId,
+          },
+        }
+      : {}),
   };
 }
 

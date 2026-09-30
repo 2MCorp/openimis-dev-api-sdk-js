@@ -144,6 +144,25 @@ export function medicalServiceFromChargeItemDefinition(
     }
   }
 
+  const money = resource.propertyGroup?.[0]?.priceComponent?.[0]?.amount;
+  let unitPrice: number | undefined =
+    money?.value !== undefined && money?.value !== null
+      ? Number(money.value)
+      : undefined;
+
+  // Fallback: some payloads expose price as a unit-price extension (medications-style).
+  if (unitPrice === undefined || !Number.isFinite(unitPrice)) {
+    for (const ext of resource.extension ?? []) {
+      const url = String(ext.url ?? "");
+      if (!url.includes("unit-price")) continue;
+      const raw = ext.valueMoney?.value;
+      if (raw !== undefined && raw !== null) {
+        unitPrice = Number(raw);
+        break;
+      }
+    }
+  }
+
   return new MedicalServiceModel(
     resource.id ?? coding?.code ?? "",
     coding?.code ?? "",
@@ -153,8 +172,8 @@ export function medicalServiceFromChargeItemDefinition(
     }),
     resource.status,
     undefined,
-    undefined,
-    undefined,
+    Number.isFinite(unitPrice) ? unitPrice : undefined,
+    money?.currency,
     undefined,
     serviceType
   );

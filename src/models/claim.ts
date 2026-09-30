@@ -34,6 +34,9 @@ export class ClaimAttachmentModel {
 }
 
 export class ClaimModel {
+  /** Patient display name from FHIR `patient.display` when available. */
+  public patientName?: string;
+
   constructor(
     public id: string,
     public code: string,

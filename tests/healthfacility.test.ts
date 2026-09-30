@@ -9,7 +9,10 @@ import {
 } from "../src/healthfacility/types";
 import { ClaimModel, ClaimAttachmentModel } from "../src/models/claim";
 import { ClaimChargeItemModel } from "../src/models/claim_charge_item";
-import { PreauthorizationModel } from "../src/models/preauthorization";
+import {
+  DiagnosisCode,
+  PreauthorizationModel,
+} from "../src/models/preauthorization";
 import {
   MockHttpClient,
   searchBundle,
@@ -35,7 +38,7 @@ function createClient(http = new MockHttpClient()) {
 
 describe("HealthFacilityDevAPIClient", () => {
   describe("patients", () => {
-    it("searches by CHF id with skipAuth", async () => {
+    it("searches by CHF id with auth", async () => {
       const { http, client } = createClient();
       http.on("GET", "/health-facility-dev-api/search-patient/", samplePatientFhir());
 
@@ -45,10 +48,10 @@ describe("HealthFacilityDevAPIClient", () => {
       expect(result.data?.chfId).toBe("CHF123456");
       expect(result.data?.lastName).toBe("Doe");
       expect(http.lastCall?.path).toContain("identifier=CHF123456");
-      expect(http.lastCall?.options?.skipAuth).toBe(true);
+      expect(http.lastCall?.options?.skipAuth).toBeFalsy();
     });
 
-    it("gets by identifier path with skipAuth", async () => {
+    it("gets by identifier path with auth", async () => {
       const { http, client } = createClient();
       http.on(
         "GET",
@@ -61,7 +64,7 @@ describe("HealthFacilityDevAPIClient", () => {
       expect(http.lastCall?.path).toBe(
         "/health-facility-dev-api/search-patient/CHF123456/"
       );
-      expect(http.lastCall?.options?.skipAuth).toBe(true);
+      expect(http.lastCall?.options?.skipAuth).toBeFalsy();
     });
   });
 
@@ -75,7 +78,7 @@ describe("HealthFacilityDevAPIClient", () => {
       );
 
       const result = await client.claims.list(
-        new ClaimListFilters(0, 10, undefined, undefined, undefined, "CHF123456", "entered")
+        new ClaimListFilters(1, 10, undefined, undefined, undefined, "CHF123456", "entered")
       );
 
       expect(result.success).toBe(true);
@@ -83,7 +86,7 @@ describe("HealthFacilityDevAPIClient", () => {
       expect(result.data?.total).toBe(1);
       expect(result.data?.items[0]?.code).toBe("CLM-001");
       expect(result.data?.items[0]?.patientChfId).toBe("CHF123456");
-      expect(http.lastCall?.path).toContain("page-offset=0");
+      expect(http.lastCall?.path).toContain("page-offset=1");
       expect(http.lastCall?.path).toContain("_count=10");
       expect(http.lastCall?.path).toContain("patientChfid=CHF123456");
       expect(http.lastCall?.path).toContain("status=entered");
@@ -192,10 +195,76 @@ describe("HealthFacilityDevAPIClient", () => {
       expect(http.lastCall?.path).toContain("_count=20");
 
       const created = await client.preauthorizations.create(
-        new PreauthorizationModel("preauth-1", "Entered", "CHF123456")
+        new PreauthorizationModel(
+          "",
+          "Entered",
+          "CHF123456",
+          undefined,
+          undefined,
+          "Jane Doe",
+          undefined,
+          undefined,
+          "hf-to-uuid",
+          "HF To",
+          new DiagnosisCode("12", "Dx"),
+          undefined,
+          undefined,
+          undefined,
+          new DiagnosisCode("svc-uuid", "Service")
+        )
       );
       expect(created.success).toBe(true);
       expect(created.data?.patientChfId).toBe("CHF123456");
+      const body = http.lastCall?.body as { extension?: Array<{ url: string; valueString?: string }> };
+      expect(
+        body.extension?.some(
+          (e) =>
+            e.url ===
+              "http://openimis.org/fhir/StructureDefinition/ref-hf-to" &&
+            e.valueString === "hf-to-uuid"
+        )
+      ).toBe(true);
+    });
+
+    it("bulk-creates via $bulk-create", async () => {
+      const { http, client } = createClient();
+      const fhir = samplePreauthFhir();
+      http.on(
+        "POST",
+        "/health-facility-dev-api/preauthorizations/$bulk-create/",
+        {
+          message: "Created 1 of 1",
+          data: { created: [fhir], errors: [] },
+        }
+      );
+
+      const item = new PreauthorizationModel(
+        "",
+        "Entered",
+        "CHF123456",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "hf-to-uuid",
+        undefined,
+        new DiagnosisCode("12", "Dx"),
+        undefined,
+        undefined,
+        undefined,
+        new DiagnosisCode("svc-uuid")
+      );
+
+      const result = await client.preauthorizations.bulkCreate([item]);
+      expect(result.success).toBe(true);
+      expect(result.data?.created.length).toBe(1);
+      expect(http.lastCall?.path).toBe(
+        "/health-facility-dev-api/preauthorizations/$bulk-create/"
+      );
+      const bundle = http.lastCall?.body as { type?: string; entry?: unknown[] };
+      expect(bundle.type).toBe("collection");
+      expect(bundle.entry?.length).toBe(1);
     });
   });
 

@@ -223,7 +223,7 @@ describe("FormalSectorDevAPIClient", () => {
       expect(got.data?.status).toBe("active");
     });
 
-    it("lists and gets staffs", async () => {
+    it("lists, gets, creates, and updates staffs", async () => {
       const { http, client } = createClient();
       const fhir = sampleStaffFhir();
       http
@@ -232,7 +232,12 @@ describe("FormalSectorDevAPIClient", () => {
           "/policy-holder-dev-api/staffs/",
           searchBundle("OrganizationAffiliation", [fhir])
         )
-        .on("GET", "/policy-holder-dev-api/staffs/staff-uuid-1/", fhir);
+        .on("GET", "/policy-holder-dev-api/staffs/staff-uuid-1/", fhir)
+        .on("POST", "/policy-holder-dev-api/staffs/", fhir)
+        .on("PATCH", "/policy-holder-dev-api/staffs/staff-uuid-1/", {
+          ...fhir,
+          active: false,
+        });
 
       const page = await client.staffs.list();
       expect(page.success).toBe(true);
@@ -243,6 +248,26 @@ describe("FormalSectorDevAPIClient", () => {
       expect(got.success).toBe(true);
       expect(got.data?.active).toBe(true);
       expect(got.data?.uuid).toBe("staff-uuid-1");
+
+      const created = await client.staffs.create({
+        username: "phstaff1",
+        email: "phstaff1@example.com",
+        password: "Secret123!",
+        role: "STAFF",
+      });
+      expect(created.success).toBe(true);
+      expect(created.data?.uuid).toBe("staff-uuid-1");
+      expect(http.lastCall?.method).toBe("POST");
+      expect((http.lastCall?.body as { username: string }).username).toBe(
+        "phstaff1"
+      );
+
+      const updated = await client.staffs.update("staff-uuid-1", {
+        is_active: false,
+      });
+      expect(updated.success).toBe(true);
+      expect(updated.data?.active).toBe(false);
+      expect(http.lastCall?.method).toBe("PATCH");
     });
   });
 

@@ -6,15 +6,82 @@ import {
   PasswordResetConfirmResponse,
   PasswordResetRequest,
   PasswordResetRequestResponse,
+  RegisterPortalUserRequest,
+  RegisterPortalUserResponse,
+  ResendPortalVerificationRequest,
+  ResendPortalVerificationResponse,
   UserInfo,
   VerifyOtpRequest,
   VerifyOtpResponse,
+  VerifyPortalEmailRequest,
+  VerifyPortalEmailResponse,
 } from "./types";
 
 const BASE_PATH = "/authentication/user-auth";
 
 class UserAuthAPIClient {
   constructor(private readonly httpClient: HttpClient) {}
+
+  /**
+   * Portal (HF/PH) self-registration. Does not persist a token —
+   * caller should login after email verification.
+   */
+  async register(
+    payload:
+      | RegisterPortalUserRequest
+      | { username: string; email: string; password: string }
+  ): Promise<ApiResponse<RegisterPortalUserResponse>> {
+    const body =
+      payload instanceof RegisterPortalUserRequest
+        ? payload.toJSON()
+        : {
+            username: payload.username,
+            email: payload.email,
+            password: payload.password,
+          };
+    const response = await this.httpClient.post<Record<string, unknown>>(
+      `${BASE_PATH}/register/`,
+      body,
+      { skipAuth: true }
+    );
+    return mapData(response, (data) =>
+      RegisterPortalUserResponse.fromJSON(data as Record<string, unknown>)
+    );
+  }
+
+  async verify(
+    payload: VerifyPortalEmailRequest | { email: string; otp: string }
+  ): Promise<ApiResponse<VerifyPortalEmailResponse>> {
+    const body =
+      payload instanceof VerifyPortalEmailRequest
+        ? payload.toJSON()
+        : { email: payload.email, otp: payload.otp };
+    const response = await this.httpClient.post<Record<string, unknown>>(
+      `${BASE_PATH}/verify/`,
+      body,
+      { skipAuth: true }
+    );
+    return mapData(response, (data) =>
+      VerifyPortalEmailResponse.fromJSON(data as Record<string, unknown>)
+    );
+  }
+
+  async resendVerify(
+    payload: ResendPortalVerificationRequest | { email: string }
+  ): Promise<ApiResponse<ResendPortalVerificationResponse>> {
+    const body =
+      payload instanceof ResendPortalVerificationRequest
+        ? payload.toJSON()
+        : { email: payload.email };
+    const response = await this.httpClient.post<Record<string, unknown>>(
+      `${BASE_PATH}/verify/resend/`,
+      body,
+      { skipAuth: true }
+    );
+    return mapData(response, (data) =>
+      ResendPortalVerificationResponse.fromJSON(data as Record<string, unknown>)
+    );
+  }
 
   async login(
     credentials: LoginCredentials,

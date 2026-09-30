@@ -1,6 +1,6 @@
 /// <reference types="fhir" />
 
-import { PatientModel } from "../models/patient";
+import { PatientContact, PatientModel } from "../models/patient";
 import BaseFhirConverter from "./base";
 import { OPENIMIS_IDENTIFIER_SYSTEM } from "./constants";
 import {
@@ -21,6 +21,73 @@ import {
   getUuidIdentifier,
   referenceId,
 } from "./helpers";
+
+function mapFhirContact(contact: fhir4.PatientContact): PatientContact {
+  const family = contact.name?.family?.trim() || undefined;
+  const given = contact.name?.given?.filter(Boolean).join(" ").trim() || undefined;
+  const text = contact.name?.text?.trim() || undefined;
+  const relationshipCoding = contact.relationship?.[0]?.coding?.[0];
+
+  return {
+    lastName: family,
+    otherNames: given || (!family ? text : undefined),
+    relationshipId: relationshipCoding?.code,
+    relationshipDisplay:
+      relationshipCoding?.display ?? contact.relationship?.[0]?.text,
+    phone: getTelecom(contact.telecom, "phone"),
+    email: getTelecom(contact.telecom, "email"),
+    gender: genderFromFhir(contact.gender),
+  };
+}
+
+function contactHasData(contact: PatientContact): boolean {
+  return !!(
+    contact.lastName ||
+    contact.otherNames ||
+    contact.relationshipId ||
+    contact.relationshipDisplay ||
+    contact.phone ||
+    contact.email ||
+    contact.gender
+  );
+}
+
+function mapContactToFhir(contact: PatientContact): fhir4.PatientContact {
+  const fhirContact: fhir4.PatientContact = {};
+
+  if (contact.relationshipId || contact.relationshipDisplay) {
+    fhirContact.relationship = [
+      {
+        coding: [
+          {
+            code: contact.relationshipId,
+            display: contact.relationshipDisplay,
+          },
+        ],
+        text: contact.relationshipDisplay,
+      },
+    ];
+  }
+
+  if (contact.lastName || contact.otherNames) {
+    fhirContact.name = buildPersonName(
+      contact.lastName ?? "",
+      contact.otherNames ?? ""
+    );
+  }
+
+  const telecom = buildTelecom(contact.phone, contact.email);
+  if (telecom) {
+    fhirContact.telecom = telecom;
+  }
+
+  const gender = genderToFhir(contact.gender);
+  if (gender) {
+    fhirContact.gender = gender;
+  }
+
+  return fhirContact;
+}
 
 class PatientFhirConverter extends BaseFhirConverter<
   PatientModel,
@@ -77,7 +144,10 @@ class PatientFhirConverter extends BaseFhirConverter<
       resource.extension,
       "patient-group-reference"
     );
-    const contact = resource.contact?.[0];
+    const contacts = (resource.contact ?? [])
+      .map(mapFhirContact)
+      .filter(contactHasData);
+    const primaryContact = contacts[0];
     const photo = resource.photo?.[0];
 
     return new PatientModel(
@@ -100,8 +170,8 @@ class PatientFhirConverter extends BaseFhirConverter<
       getIdentifierValue(identifiers, { typeCode: "PPN" }) ?? passportFromExt,
       identificationType,
       familyRef?.includes("/") ? familyRef.split("/").pop() : familyRef,
-      contact?.relationship?.[0]?.coding?.[0]?.code,
-      contact?.relationship?.[0]?.coding?.[0]?.display,
+      primaryContact?.relationshipId,
+      primaryContact?.relationshipDisplay,
       referenceId(resource.generalPractitioner?.[0]),
       address?.text,
       referenceId(locationRef),
@@ -114,7 +184,8 @@ class PatientFhirConverter extends BaseFhirConverter<
       photo?.title,
       photo?.contentType,
       photo?.creation,
-      photo?.data
+      photo?.data,
+      contacts
     );
   }
 
@@ -212,6 +283,19 @@ class PatientFhirConverter extends BaseFhirConverter<
       });
     }
 
+    let contacts = (model.contacts ?? []).filter(contactHasData).map(mapContactToFhir);
+    if (
+      !contacts.length &&
+      (model.relationshipId || model.relationshipDisplay)
+    ) {
+      contacts = [
+        mapContactToFhir({
+          relationshipId: model.relationshipId,
+          relationshipDisplay: model.relationshipDisplay,
+        }),
+      ];
+    }
+
     const patient: fhir4.Patient = {
       resourceType: "Patient",
       id: model.id || model.uuid || model.chfId,
@@ -224,6 +308,7 @@ class PatientFhirConverter extends BaseFhirConverter<
       maritalStatus: model.maritalStatus
         ? { coding: [{ code: model.maritalStatus }] }
         : undefined,
+      contact: contacts.length ? contacts : undefined,
       address:
         model.currentAddress || model.locationUuid
           ? [

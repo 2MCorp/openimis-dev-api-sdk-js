@@ -1,4 +1,5 @@
 export { PatientModel } from "./patient";
+export type { PatientContact } from "./patient";
 export {
   ClaimModel,
   ClaimItemModel,
@@ -37,6 +38,9 @@ export {
   PaymentReconciliationDetailModel,
 } from "./payment";
 export { CoverageModel } from "./coverage";
-export { StaffModel } from "./staff";
+export { StaffModel, HfStaffModel } from "./staff";
+export type { CreateStaffPayload, UpdateStaffPayload } from "./staff";
 export { BinaryModel } from "./binary";
+export { BulkEncounterResult, BulkEncounterRow } from "./bulk";
+export { EnrollmentLocation, EnrollmentLegalForm } from "./enrollment_metadata";
 export { FhirSearchPage } from "./pagination";
