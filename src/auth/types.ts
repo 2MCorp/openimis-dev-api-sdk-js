@@ -96,6 +96,18 @@ export class PolicyHolderInfo {
       data.email != null ? String(data.email) : undefined
     );
   }
+
+  /** `undefined` for missing / empty payloads (no code = not linked). */
+  static fromOptionalJSON(data: unknown): PolicyHolderInfo | undefined {
+    if (!data || typeof data !== "object") return undefined;
+    const info = PolicyHolderInfo.fromJSON(data as Record<string, unknown>);
+    return info.code.trim() ? info : undefined;
+  }
+
+  /** Trade name, falling back to the code when the backend sends none. */
+  get displayName(): string {
+    return this.tradeName.trim() || this.code;
+  }
 }
 
 export class UserInfo {
@@ -118,6 +130,33 @@ export class UserInfo {
     public readonly groups: string[] = []
   ) {}
 
+  /** Every employer linked to the account (primary first, de-duplicated by code). */
+  linkedPolicyHolders(): PolicyHolderInfo[] {
+    const all = [
+      ...(this.policyHolder ? [this.policyHolder] : []),
+      ...(this.policyHolders ?? []),
+    ];
+    const seen = new Set<string>();
+    return all.filter((ph) => {
+      if (seen.has(ph.code)) return false;
+      seen.add(ph.code);
+      return true;
+    });
+  }
+
+  /**
+   * Employer to act as (sent as `PolicyHolder-Code`): the preferred code when it is
+   * still linked, else the primary employer, else the first linked one.
+   */
+  activePolicyHolder(preferredCode?: string): PolicyHolderInfo | undefined {
+    const linked = this.linkedPolicyHolders();
+    return (
+      (preferredCode ? linked.find((ph) => ph.code === preferredCode) : undefined) ??
+      this.policyHolder ??
+      linked[0]
+    );
+  }
+
   static fromJSON(data: Record<string, unknown>): UserInfo {
     const healthFacility =
       data.health_facility &&
@@ -128,17 +167,13 @@ export class UserInfo {
           )
         : undefined;
 
-    const policyHolder =
-      data.policy_holder && typeof data.policy_holder === "object"
-        ? PolicyHolderInfo.fromJSON(
-            data.policy_holder as Record<string, unknown>
-          )
-        : undefined;
+    // `/user/` sends `policy_holder: {}` for accounts not linked to an employer.
+    const policyHolder = PolicyHolderInfo.fromOptionalJSON(data.policy_holder);
 
     const policyHolders = Array.isArray(data.policy_holders)
-      ? data.policy_holders.map((item) =>
-          PolicyHolderInfo.fromJSON(item as Record<string, unknown>)
-        )
+      ? data.policy_holders
+          .map((item) => PolicyHolderInfo.fromOptionalJSON(item))
+          .filter((item): item is PolicyHolderInfo => item != null)
       : undefined;
 
     const emailVerified =

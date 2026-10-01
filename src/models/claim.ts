@@ -36,6 +36,12 @@ export class ClaimAttachmentModel {
 export class ClaimModel {
   /** Patient display name from FHIR `patient.display` when available. */
   public patientName?: string;
+  /** `claim-approved-amount` extension (set once the claim is processed). */
+  public approvedAmount?: number;
+  /** `claim-valuated-amount` extension. */
+  public valuatedAmount?: number;
+  /** `claim-date-processed` extension (`YYYY-MM-DD`). */
+  public dateProcessed?: string;
 
   constructor(
     public id: string,

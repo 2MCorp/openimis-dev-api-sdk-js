@@ -63,6 +63,7 @@ export {
   PH_BASE_PATH,
   EmployeeListFilters,
   ContractListFilters,
+  PaymentListFilters,
   InsurancePlanListFilters,
   EmployeeClaimListFilters,
   EmployeeBinaryUploadQuery,
@@ -71,6 +72,7 @@ export {
   DASHBOARD_BASE_PATH,
   DashboardQueryParams,
 } from "./dashboard/types";
+export type { DashboardGranularity } from "./dashboard/types";
 export * from "./dashboard/models";
 export { EMR_BASE_PATH } from "./emr/types";
 export {
@@ -110,3 +112,16 @@ export type {
   HfUpdateSubscribeOptions,
   HfMutationSubscribeOptions,
 } from "./event_bus";
+
+// Portal business logic shared by the HF and employer portals.
+export * from "./auth/permissions";
+export * from "./utils";
+export * from "./formalsector/employee_ops";
+export * from "./formalsector/contract_ops";
+export * from "./formalsector/contract_states";
+export * from "./formalsector/payment_status";
+export type { EmployeeProfile } from "./formalsector";
+export { FormalSectorPatientsClient } from "./formalsector";
+export * from "./dashboard/policy_holder_views";
+export type { PolicyHolderOverview } from "./dashboard";
+export * from "./enrollment/enrollment_ops";

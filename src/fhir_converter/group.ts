@@ -33,8 +33,16 @@ function membersFromGroup(resource: fhir4.Group): GroupMemberModel[] {
       ext.url?.includes("insuree-uuid"),
     );
     const insureeUuid = uuidExtension?.valueString;
+    const headExtension = entity?.extension?.find((ext) =>
+      ext.url?.includes("patient-is-head"),
+    );
 
-    return new GroupMemberModel(chfId, entity?.display, insureeUuid);
+    return new GroupMemberModel(
+      chfId,
+      entity?.display,
+      insureeUuid,
+      headExtension?.valueBoolean,
+    );
   });
 }
 

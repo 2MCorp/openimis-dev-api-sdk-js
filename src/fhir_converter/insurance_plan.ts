@@ -21,12 +21,9 @@ class EmployeeInsurancePlanFhirConverter extends BaseFhirConverter<
     const plans = (resource.plan ?? []).map((plan) => {
       const planType = Array.isArray(plan.type) ? plan.type[0] : plan.type;
       return new InsurancePlanDetailModel(
-        getIdentifierValue(plan.identifier, { systemIncludes: "CPBDID" }) ??
-          getIdentifierValue(plan.identifier, { typeCode: "CPBDID" }),
-        getIdentifierValue(plan.identifier, { systemIncludes: "CPID" }) ??
-          getIdentifierValue(plan.identifier, { typeCode: "CPID" }),
-        getIdentifierValue(plan.identifier, { systemIncludes: "CPCODE" }) ??
-          planType?.coding?.[0]?.code,
+        identifierByType(plan.identifier, "CPBDID"),
+        identifierByType(plan.identifier, "CPID"),
+        identifierByType(plan.identifier, "CPCODE") ?? planType?.coding?.[0]?.code,
         planType?.coding?.[0]?.display ?? planType?.text
       );
     });
@@ -34,74 +31,58 @@ class EmployeeInsurancePlanFhirConverter extends BaseFhirConverter<
     return new EmployeeInsurancePlanModel(
       String(resource.id ?? ""),
       resource.name ?? "",
-      getIdentifierValue(resource.identifier, { systemIncludes: "PHCPID" }) ??
-        String(resource.id ?? ""),
-      getIdentifierValue(resource.identifier, { systemIncludes: "CPBUUID" }),
-      getIdentifierValue(resource.identifier, { systemIncludes: "CPBID" }),
-      getIdentifierValue(resource.identifier, { systemIncludes: "CPBCODE" }),
+      identifierByType(resource.identifier, "PHCPID") ?? String(resource.id ?? ""),
+      identifierByType(resource.identifier, "CPBUUID"),
+      identifierByType(resource.identifier, "CPBID"),
+      identifierByType(resource.identifier, "CPBCODE"),
       plans
     );
   }
 
+  /** Same shape as the backend `EmployeeInsurancePlanConverter` (read-only resource). */
   toFhir(model: EmployeeInsurancePlanModel): fhir4.InsurancePlan {
+    const typed = (system: string, value: string | undefined, code: string) =>
+      value ? [{ system, value, type: { coding: [{ system: IDENTIFIER_TYPE_SYSTEM, code }] } }] : [];
     return {
       resourceType: "InsurancePlan",
       id: model.id,
       name: model.name,
       identifier: [
-        {
-          system: "http://example.com/fhir/PHCPID",
-          value: model.policyHolderContributionPlanId ?? model.id,
-        },
-        ...(model.contributionPlanBundleUuid
-          ? [
-              {
-                system: "http://example.com/fhir/CPBUUID",
-                value: model.contributionPlanBundleUuid,
-              },
-            ]
-          : []),
-        ...(model.contributionPlanBundleId
-          ? [
-              {
-                system: "http://example.com/fhir/CPBID",
-                value: model.contributionPlanBundleId,
-              },
-            ]
-          : []),
-        ...(model.contributionPlanBundleCode
-          ? [
-              {
-                system: "http://example.com/fhir/CPBCODE",
-                value: model.contributionPlanBundleCode,
-              },
-            ]
-          : []),
+        ...typed(`${EXAMPLE}/identifier`, model.policyHolderContributionPlanId ?? model.id, "PHCPID"),
+        ...typed(`${EXAMPLE}/contributionplanbundle-identifier`, model.contributionPlanBundleUuid, "CPBUUID"),
+        ...typed(`${EXAMPLE}/contributionplanbundle-identifier`, model.contributionPlanBundleId, "CPBID"),
+        ...typed(`${EXAMPLE}/contributionplanbundle-code`, model.contributionPlanBundleCode, "CPBCODE"),
       ],
       plan: model.plans.map((plan) => ({
         identifier: [
-          ...(plan.detailId
-            ? [{ system: "http://example.com/fhir/CPBDID", value: plan.detailId }]
-            : []),
-          ...(plan.contributionPlanId
-            ? [
-                {
-                  system: "http://example.com/fhir/CPID",
-                  value: plan.contributionPlanId,
-                },
-              ]
-            : []),
-          ...(plan.code
-            ? [{ system: "http://example.com/fhir/CPCODE", value: plan.code }]
-            : []),
+          ...typed(`${EXAMPLE}/identifier`, plan.detailId, "CPBDID"),
+          ...typed(`${EXAMPLE}/contributionplan-identifier`, plan.contributionPlanId, "CPID"),
+          ...typed(`${EXAMPLE}/contributionplan-code`, plan.code, "CPCODE"),
         ],
-        type:
-          plan.code || plan.name
-            ? { coding: [{ code: plan.code, display: plan.name }] }
-            : undefined,
+        type: {
+          coding: [{ system: `${EXAMPLE}/contributionplan-code`, code: plan.code, display: plan.name }],
+        },
       })),
     };
   }
+}
+
+const EXAMPLE = "http://example.com/fhir";
+const IDENTIFIER_TYPE_SYSTEM = `${EXAMPLE}/identifier-type`;
+
+/**
+ * The backend tags each identifier with a type code (PHCPID, CPBUUID, CPBID, CPBCODE,
+ * CPBDID, CPID, CPCODE) under shared systems — match on the type code, falling back
+ * to a system containing the code for older emitters.
+ */
+function identifierByType(
+  identifiers: fhir4.Identifier[] | undefined,
+  code: string
+): string | undefined {
+  return (
+    getIdentifierValue(identifiers, { typeCode: code }) ??
+    getIdentifierValue(identifiers, { systemIncludes: code })
+  );
 }
 
 export default EmployeeInsurancePlanFhirConverter;

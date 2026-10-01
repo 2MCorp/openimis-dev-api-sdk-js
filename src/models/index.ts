@@ -7,7 +7,7 @@ export {
   ClaimAttachmentModel,
 } from "./claim";
 export { ClaimChargeItemModel } from "./claim_charge_item";
-export { EmployeeModel } from "./employee";
+export { EmployeeModel, splitBundleDisplay } from "./employee";
 export {
   HealthFacilityModel,
   HealthFacilityOrganizationModel,
@@ -30,6 +30,8 @@ export {
 export {
   EmployeeInsurancePlanModel,
   InsurancePlanDetailModel,
+  dedupeInsurancePlans,
+  insurancePlanPackageKey,
 } from "./insurance_plan";
 export {
   PaymentNoticeModel,
@@ -38,8 +40,8 @@ export {
   PaymentReconciliationDetailModel,
 } from "./payment";
 export { CoverageModel } from "./coverage";
-export { StaffModel, HfStaffModel } from "./staff";
-export type { CreateStaffPayload, UpdateStaffPayload } from "./staff";
+export { StaffModel, HfStaffModel, STAFF_ROLES, validateStaffAccount } from "./staff";
+export type { CreateStaffPayload, UpdateStaffPayload, StaffRole, StaffFieldError } from "./staff";
 export { BinaryModel } from "./binary";
 export { BulkEncounterResult, BulkEncounterRow } from "./bulk";
 export { EnrollmentLocation, EnrollmentLegalForm } from "./enrollment_metadata";

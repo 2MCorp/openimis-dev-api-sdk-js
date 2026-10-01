@@ -6,6 +6,7 @@ import {
   CreateStaffPayload,
   StaffModel,
   UpdateStaffPayload,
+  validateStaffAccount,
 } from "../models/staff";
 import { FhirSearchPage } from "../models/pagination";
 import {
@@ -48,6 +49,8 @@ class FormalSectorStaffsClient {
   async create(
     payload: CreateStaffPayload
   ): Promise<ApiResponse<StaffModel>> {
+    const errors = validateStaffAccount(payload);
+    if (errors.length) return ApiResponse.fail("400", errors[0].message, errors);
     const response = await this.httpClient.post<unknown>(
       `${PH_BASE_PATH}/staffs/`,
       payload

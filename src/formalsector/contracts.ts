@@ -11,6 +11,7 @@ import {
   asFhirResource,
   buildQuery,
 } from "./types";
+import { ContractDraftInput, contractModelForDraft, validateContractDraft } from "./contract_ops";
 
 class FormalSectorContractsClient {
   private readonly converter = new ContractFhirConverter();
@@ -35,6 +36,15 @@ class FormalSectorContractsClient {
     return mapData(response, (data) =>
       this.converter.fromFhir(asFhirResource<fhir4.Contract>(data))
     );
+  }
+
+  /** Validate and create a draft contract; field errors come back in `errorDetails`. */
+  async createDraft(input: ContractDraftInput): Promise<ApiResponse<ContractModel>> {
+    const errors = validateContractDraft(input);
+    if (errors.length) {
+      return ApiResponse.fail("400", errors[0].message, errors);
+    }
+    return this.create(contractModelForDraft(input));
   }
 
   async create(contract: ContractModel): Promise<ApiResponse<ContractModel>> {

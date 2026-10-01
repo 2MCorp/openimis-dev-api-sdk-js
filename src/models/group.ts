@@ -2,7 +2,9 @@ export class GroupMemberModel {
   constructor(
     public chfId: string,
     public display?: string,
-    public insureeUuid?: string
+    public insureeUuid?: string,
+    /** Heads the household (`patient-is-head` extension); undefined when not sent. */
+    public isHead?: boolean
   ) {}
 }
 

@@ -26,3 +26,4 @@ export {
   EnrollmentMetadataClient,
 };
 export * from "./types";
+export * from "./enrollment_ops";

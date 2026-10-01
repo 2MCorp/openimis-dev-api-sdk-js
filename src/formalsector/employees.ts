@@ -14,6 +14,16 @@ import {
   asFhirResource,
   buildQuery,
 } from "./types";
+import {
+  EmployeeEnrollmentInput,
+  EmployeeUpdateInput,
+  EmployeeUploadInput,
+  employeeModelForEnrollment,
+  employeeUploadContentType,
+  validateEmployeeEnrollment,
+  validateEmployeeUpdate,
+  validateEmployeeUpload,
+} from "./employee_ops";
 
 class FormalSectorEmployeesClient {
   private readonly converter = new EmployeeFhirConverter();
@@ -48,6 +58,53 @@ class FormalSectorEmployeesClient {
     );
     return mapData(response, (data) =>
       this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
+    );
+  }
+
+  /**
+   * Validate and enrol an existing insuree on a health package.
+   * Returns a 400 failure with field errors in `errorDetails` when input is invalid.
+   */
+  async enroll(input: EmployeeEnrollmentInput): Promise<ApiResponse<EmployeeModel>> {
+    const errors = validateEmployeeEnrollment(input);
+    if (errors.length) {
+      return ApiResponse.fail("400", errors[0].message, errors);
+    }
+    return this.create(employeeModelForEnrollment(input));
+  }
+
+  /**
+   * Validate and change an employee's health package and/or income. The backend
+   * checks the package belongs to the employer and updates the record in place.
+   */
+  async update(pk: string, input: EmployeeUpdateInput): Promise<ApiResponse<EmployeeModel>> {
+    const errors = validateEmployeeUpdate(input);
+    if (errors.length) return ApiResponse.fail("400", errors[0].message, errors);
+    const body: Record<string, unknown> = {};
+    const planId = input.policyHolderContributionPlanId?.trim();
+    if (planId) body.policy_holder_contribution_plan_id = planId;
+    if (input.income != null) body.income = input.income;
+    const response = await this.httpClient.patch<unknown>(
+      `${PH_BASE_PATH}/employees/${encodeURIComponent(pk)}/`,
+      body
+    );
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
+    );
+  }
+
+  /**
+   * Validate and upload a CSV / Excel / JSON file of employees (rows parsed server-side).
+   * Row-level backend errors arrive in `errorDetails` — see `describeErrorDetails`.
+   */
+  async uploadFile(input: EmployeeUploadInput): Promise<ApiResponse<EmployeeModel[]>> {
+    const errors = validateEmployeeUpload(input);
+    if (errors.length) {
+      return ApiResponse.fail("400", errors[0].message, errors);
+    }
+    return this.uploadBinary(
+      new BinaryModel(employeeUploadContentType(input.fileName)!, input.base64),
+      new EmployeeBinaryUploadQuery(input.defaultPlanCode || undefined)
     );
   }
 

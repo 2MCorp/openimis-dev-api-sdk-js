@@ -7,6 +7,9 @@ import {
   getIdentifierValue,
   getUuidIdentifier,
 } from "./helpers";
+import { staffContactName, staffTelecom } from "./staff_contact";
+
+const USERNAME_IDENTIFIER_SYSTEM = "https://openimis.org/CodeSystem/username";
 
 class StaffFhirConverter extends BaseFhirConverter<
   StaffModel,
@@ -28,7 +31,13 @@ class StaffFhirConverter extends BaseFhirConverter<
         }) ??
         resource.id ??
         "",
-      resource.active
+      resource.active,
+      getIdentifierValue(resource.identifier, { system: USERNAME_IDENTIFIER_SYSTEM }),
+      staffContactName(resource as never) ??
+        getIdentifierValue(resource.identifier, { system: USERNAME_IDENTIFIER_SYSTEM }),
+      resource.code?.[0]?.coding?.[0]?.code ?? resource.code?.[0]?.text,
+      staffTelecom(resource as never, "email"),
+      staffTelecom(resource as never, "phone")
     );
   }
 

@@ -150,13 +150,20 @@ class PaymentReconciliationFhirConverter {
 
   fromFhir(resource: fhir4.PaymentReconciliation): PaymentReconciliationModel {
     assertResourceType(resource, "PaymentReconciliation");
+    // The backend builds the resource with fhir.resources R5 names (`amount`, `date`);
+    // R4 names (`paymentAmount`, `paymentDate`) are kept as fallbacks.
+    const r5 = resource as fhir4.PaymentReconciliation & {
+      amount?: fhir4.Money;
+      date?: string;
+    };
+    const amount = r5.amount ?? resource.paymentAmount;
     return new PaymentReconciliationModel(
       resource.id ?? "",
       resource.status,
       resource.created,
-      resource.paymentDate,
-      resource.paymentAmount?.value,
-      resource.paymentAmount?.currency,
+      resource.paymentDate ?? r5.date,
+      amount?.value,
+      amount?.currency,
       getIdentifierValue(resource.identifier, {
         systemIncludes: "transaction",
       }),
@@ -164,7 +171,7 @@ class PaymentReconciliationFhirConverter {
         systemIncludes: "receipt",
       }),
       resource.disposition,
-      resource.processNote?.[0]?.text,
+      contractCodeFromNote(resource.processNote?.[0]?.text),
       (resource.detail ?? []).map(
         (detail) =>
           new PaymentReconciliationDetailModel(
@@ -221,3 +228,16 @@ class PaymentReconciliationFhirConverter {
 }
 
 export { PaymentNoticeFhirConverter, PaymentReconciliationFhirConverter };
+
+/** Placeholder texts `PaymentConverter.build_contract_origin` sends when there is no contract. */
+const NO_CONTRACT_NOTES = new Set([
+  "no contract details found",
+  "no contract details available",
+  "contract not found",
+]);
+
+function contractCodeFromNote(text: string | undefined): string | undefined {
+  const value = text?.trim();
+  if (!value || NO_CONTRACT_NOTES.has(value.toLowerCase())) return undefined;
+  return value;
+}

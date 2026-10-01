@@ -176,6 +176,30 @@ describe("FormalSectorDevAPIClient", () => {
         "Contract"
       );
     });
+
+    it("sends the contract code as the first identifier on create", async () => {
+      const { http, client } = createClient();
+      http.on("POST", "/policy-holder-dev-api/contracts/", sampleContractFhir());
+
+      await client.contracts.create(
+        new ContractModel(
+          "",
+          "CTR-NEW",
+          undefined,
+          undefined,
+          undefined,
+          "2026-01-01",
+          "2026-12-31"
+        )
+      );
+
+      const body = http.lastCall?.body as fhir4.Contract;
+      expect(body.id).toBeUndefined();
+      expect(body.identifier).toEqual([
+        { system: "http://openimis.org/contract-code", value: "CTR-NEW" },
+      ]);
+      expect(body.applies).toEqual({ start: "2026-01-01", end: "2026-12-31" });
+    });
   });
 
   describe("insurancePlans / payments / staffs", () => {

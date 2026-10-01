@@ -38,7 +38,9 @@ export class ContractListFilters extends FhirListParams {
     count?: number,
     public code?: string,
     /** Single date or `start||end` range. */
-    public dateApproved?: string
+    public dateApproved?: string,
+    /** Only contracts covering this employee (insuree CHF ID). */
+    public chfId?: string
   ) {
     super(pageOffset, count);
   }
@@ -48,7 +50,23 @@ export class ContractListFilters extends FhirListParams {
       ...super.toQuery(),
       code: this.code,
       date_approved: this.dateApproved,
+      _chfid: this.chfId,
     };
+  }
+}
+
+export class PaymentListFilters extends FhirListParams {
+  constructor(
+    pageOffset?: number,
+    count?: number,
+    /** Only payments with a detail line for this employee (insuree CHF ID). */
+    public chfId?: string
+  ) {
+    super(pageOffset, count);
+  }
+
+  override toQuery(): Record<string, string | number | boolean | undefined> {
+    return { ...super.toQuery(), _chfid: this.chfId };
   }
 }
 

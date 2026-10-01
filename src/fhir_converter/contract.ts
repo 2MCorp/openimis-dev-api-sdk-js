@@ -8,6 +8,7 @@ import {
 import BaseFhirConverter from "./base";
 import {
   assertResourceType,
+  getExtension,
   getExtensionDecimal,
   getExtensionString,
   getIdentifierValue,
@@ -54,7 +55,8 @@ class ContractFhirConverter extends BaseFhirConverter<
         "",
       resource.status ?? resource.legalState?.coding?.[0]?.code,
       resource.issued,
-      resource.applies?.end,
+      // Payment due has its own extension; `applies` is the validity period.
+      getExtension(resource.extension, "paymentDueDate")?.valueDateTime,
       resource.applies?.start,
       resource.applies?.end,
       referenceId(resource.authority?.[0]),
@@ -64,7 +66,11 @@ class ContractFhirConverter extends BaseFhirConverter<
       getExtensionDecimal(resource.extension, "amountNotified"),
       getExtensionDecimal(resource.extension, "amountRectified"),
       getExtensionString(resource.extension, "paymentReference"),
-      getExtensionString(resource.extension, "amendment")
+      getExtensionString(resource.extension, "amendment"),
+      // Contract-level amount due (terms repeat it once per member detail).
+      getExtensionDecimal(resource.extension, "amountDue") ?? terms[0]?.amountDue,
+      getExtension(resource.extension, "amountDue")?.valueMoney?.currency ??
+        terms.find((t) => t.currency)?.currency
     );
   }
 
@@ -82,6 +88,18 @@ class ContractFhirConverter extends BaseFhirConverter<
         valueDecimal: model.amountRectified,
       });
     }
+    if (model.amountDue !== undefined) {
+      extensions.push({
+        url: "http://openimis.org/fhir/StructureDefinition/amountDue",
+        valueMoney: { value: model.amountDue, currency: model.currency },
+      });
+    }
+    if (model.paymentDue) {
+      extensions.push({
+        url: "http://openimis.org/fhir/StructureDefinition/paymentDueDate",
+        valueDateTime: model.paymentDue,
+      });
+    }
     if (model.paymentReference) {
       extensions.push({
         url: "http://openimis.org/fhir/StructureDefinition/paymentReference",
@@ -97,25 +115,23 @@ class ContractFhirConverter extends BaseFhirConverter<
 
     return {
       resourceType: "Contract",
-      id: model.id,
+      id: model.id || undefined,
       status: model.status as fhir4.Contract["status"],
       issued: model.issued,
+      // The backend reads the contract code from identifier[0]; the uuid
+      // identifier is only sent for existing contracts.
       identifier: [
-        {
-          system: "http://openimis.org/contract-uuid",
-          value: model.id,
-        },
         {
           system: "http://openimis.org/contract-code",
           value: model.code,
         },
+        ...(model.id
+          ? [{ system: "http://openimis.org/contract-uuid", value: model.id }]
+          : []),
       ],
       applies:
-        model.dateValidFrom || model.dateValidTo || model.paymentDue
-          ? {
-              start: model.dateValidFrom,
-              end: model.dateValidTo ?? model.paymentDue,
-            }
+        model.dateValidFrom || model.dateValidTo
+          ? { start: model.dateValidFrom, end: model.dateValidTo }
           : undefined,
       authority: model.policyHolderId
         ? [

@@ -17,6 +17,8 @@ import {
   getUuidIdentifier,
   isUuid,
   referenceId,
+  getExtension,
+  getExtensionDecimal,
 } from "./helpers";
 
 class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
@@ -126,6 +128,11 @@ class ClaimFhirConverter extends BaseFhirConverter<ClaimModel, fhir4.Claim> {
       attachments
     );
     model.patientName = resource.patient?.display?.trim() || undefined;
+    // Financial extensions from ClaimConverter.build_fhir_claim_financial_extensions.
+    model.approvedAmount = getExtensionDecimal(resource.extension, "claim-approved-amount");
+    model.valuatedAmount = getExtensionDecimal(resource.extension, "claim-valuated-amount");
+    const processed = getExtension(resource.extension, "claim-date-processed");
+    model.dateProcessed = processed?.valueDate ?? processed?.valueString ?? undefined;
     return model;
   }
 

@@ -1,3 +1,5 @@
+import { PaymentStatus, classifyPaymentStatus } from "../formalsector/payment_status";
+
 export class PaymentDetailModel {
   constructor(
     public productCode?: string,
@@ -48,4 +50,9 @@ export class PaymentReconciliationModel {
     public contractCode?: string,
     public details: PaymentReconciliationDetailModel[] = []
   ) {}
+
+  /** Portal bucket for `status` (paid / pending / failed). */
+  get statusKey(): PaymentStatus {
+    return classifyPaymentStatus(this.status);
+  }
 }

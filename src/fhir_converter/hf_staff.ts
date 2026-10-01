@@ -9,6 +9,7 @@ import {
   getUuidIdentifier,
   referenceId,
 } from "./helpers";
+import { staffTelecom } from "./staff_contact";
 
 const HF_STAFF_IDENTIFIER_SYSTEM =
   "https://openimis.org/CodeSystem/health-facility-staff";
@@ -51,8 +52,8 @@ class HfStaffFhirConverter extends BaseFhirConverter<
       }),
       resource.practitioner?.display,
       role,
-      getTelecom(resource.telecom, "email"),
-      getTelecom(resource.telecom, "phone"),
+      staffTelecom(resource as never, "email") ?? getTelecom(resource.telecom, "email"),
+      staffTelecom(resource as never, "phone") ?? getTelecom(resource.telecom, "phone"),
       referenceId(resource.organization)
     );
   }

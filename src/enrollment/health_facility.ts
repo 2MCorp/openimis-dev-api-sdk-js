@@ -7,6 +7,11 @@ import {
   HealthFacilityAccountClaimPayload,
   HealthFacilityRegistrationPayload,
 } from "./types";
+import {
+  EnrollmentSubmission,
+  isOpenEnrollmentStatus,
+  toEnrollmentSubmissions,
+} from "./enrollment_ops";
 
 const HF_REGISTRATION_PATH = `${ENROLLMENT_BASE_PATH}/health-facility/registration`;
 const HF_ACCOUNT_CLAIM_PATH = `${ENROLLMENT_BASE_PATH}/health-facility/account-claim`;
@@ -60,6 +65,37 @@ class EnrollmentHealthFacilityClient {
       `${HF_ACCOUNT_CLAIM_PATH}/`
     );
     return mapData(response, (data) => EnrollmentListResult.fromJSON(data));
+  }
+
+  /** The applicant's facility registrations and account claims. */
+  async listSubmissions(): Promise<ApiResponse<EnrollmentSubmission[]>> {
+    const [registrations, claims] = await Promise.all([
+      this.listRegistrations(),
+      this.listAccountClaims(),
+    ]);
+    if (!registrations.success) return registrations.asFailure<EnrollmentSubmission[]>();
+    return ApiResponse.ok([
+      ...toEnrollmentSubmissions(
+        registrations.data,
+        "registration",
+        "facility_data",
+        ["code", "facility_code"],
+        ["name", "facility_name"]
+      ),
+      ...(claims.success
+        ? toEnrollmentSubmissions(claims.data, "account_claim", "claim_data", [
+            "facility_code",
+            "code",
+          ])
+        : []),
+    ]);
+  }
+
+  /** True while a registration or claim is DRAFT / PENDING / IN_REVIEW. */
+  async hasOpenSubmission(): Promise<ApiResponse<boolean>> {
+    const resp = await this.listSubmissions();
+    if (!resp.success || !resp.data) return resp.asFailure<boolean>();
+    return ApiResponse.ok(resp.data.some((s) => isOpenEnrollmentStatus(s.status)));
   }
 }
 
