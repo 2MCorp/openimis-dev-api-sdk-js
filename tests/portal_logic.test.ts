@@ -15,6 +15,13 @@ import {
 } from "../src/formalsector/contract_states";
 import { validateContractDraft } from "../src/formalsector/contract_ops";
 import { employeeUploadContentType } from "../src/formalsector/employee_ops";
+import {
+  calculationLabel,
+  coerceCalculationValues,
+  employeeUploadTemplateCsv,
+  initialCalculationValues,
+  parseEmployeeCalculationForm,
+} from "../src/formalsector/calculation_inputs";
 import { classifyPaymentStatus } from "../src/formalsector/payment_status";
 import {
   PH_PORTAL_PERMISSIONS,
@@ -23,6 +30,7 @@ import {
 } from "../src/auth/permissions";
 import { UserInfo } from "../src/auth/types";
 import { EmployeeModel } from "../src/models/employee";
+import EmployeeFhirConverter from "../src/fhir_converter/employee";
 import {
   EmployeeInsurancePlanModel,
   InsurancePlanDetailModel,
@@ -424,7 +432,20 @@ describe("formal-sector workflows", () => {
     expect(http.calls.some((c) => c.method === "POST")).toBe(false);
   });
 
-  it("enrols with only the extensions the backend accepts", async () => {
+  // Shape of GET employees/calculation-params/ for the "CV: percent of income" rule set.
+  const incomeForm = {
+    class: "PolicyHolderInsuree",
+    policy_holder_contribution_plan_id: "7",
+    rule_sets: [{ id: "rs1", name: "CV: percent of income" }],
+    parameters: [
+      { name: "income", type: "number", label: { en: "Income", fr: "Salaire" }, required: true, condition: "INPUT>100", relevance: "True" },
+      { name: "grade", type: "select", label: { en: "Grade" }, default: "B", required: false, option_set: [{ value: "A", label: { en: "Grade A" } }, { value: "B", label: { en: "Grade B" } }] },
+      { name: "insured", type: "checkbox", label: { en: "Insured" }, default: "False", required: false },
+    ],
+    values: {},
+  };
+
+  it("enrols without inventing calculation inputs the package does not declare", async () => {
     const { http, client } = createClient();
     http
       .on("GET", "/policy-holder-dev-api/insurance-plans/", searchBundle("InsurancePlan", [sampleInsurancePlanFhir()]))
@@ -436,22 +457,110 @@ describe("formal-sector workflows", () => {
     expect(resp.success).toBe(true);
     const body = http.lastCall?.body as fhir4.Patient;
     expect(body.identifier?.[0]?.value).toBe("CHF1");
-    expect(body.extension?.map((e) => e.url.split("/").pop())).toEqual([
-      "employee-income",
-      "PolicyHolderContributionPlanID",
-    ]);
-    expect(body.extension?.[0]?.valueDecimal).toBe(0);
+    expect(body.extension?.map((e) => e.url.split("/").pop())).toEqual(["PolicyHolderContributionPlanID"]);
   });
 
-  it("updates package and income with a portal JSON PATCH", async () => {
+  it("enrols with the package's calculation inputs in the calculation-rule extension", async () => {
+    const { http, client } = createClient();
+    http
+      .on("GET", "/policy-holder-dev-api/insurance-plans/", searchBundle("InsurancePlan", [sampleInsurancePlanFhir()]))
+      .on("POST", "/policy-holder-dev-api/employees/", sampleEmployeeFhir());
+    http.on("GET", "/policy-holder-dev-api/employees/calculation-params/", incomeForm);
+    const planId = (await client.insurancePlans.listEnrollablePackages()).data![0].policyHolderContributionPlanId!;
+
+    const invalid = await client.enrollEmployee({ chfId: "CHF1", policyHolderContributionPlanId: planId, calculationRule: { income: "50" } });
+    expect(invalid.success).toBe(false);
+    expect(invalid.errorDetails).toEqual([{ field: "calculationRule.income", message: "Income does not meet the condition INPUT>100" }]);
+
+    const resp = await client.enrollEmployee({ chfId: "CHF1", policyHolderContributionPlanId: planId, calculationRule: { income: "4500", stray: 1 } });
+    expect(resp.success).toBe(true);
+    const body = http.lastCall?.body as fhir4.Patient;
+    expect(body.extension?.[0]).toEqual({
+      url: "http://openimis.org/fhir/StructureDefinition/calculation-rule",
+      extension: [
+        { url: "income", valueDecimal: 4500 },
+        { url: "grade", valueString: "B" },
+        { url: "insured", valueBoolean: false },
+      ],
+    });
+  });
+
+  it("fetches the inputs a package declares", async () => {
+    const { http, client } = createClient();
+    http.on("GET", "/policy-holder-dev-api/employees/calculation-params/", incomeForm);
+    const resp = await client.employees.calculationParams(" 7 ");
+    expect(http.lastCall?.path).toContain("policy_holder_contribution_plan_id=7");
+    const form = resp.data!;
+    expect(form.ruleSets).toEqual([{ id: "rs1", name: "CV: percent of income" }]);
+    expect(form.parameters.map((p) => [p.name, p.type, p.required])).toEqual([
+      ["income", "number", true],
+      ["grade", "select", false],
+      ["insured", "checkbox", false],
+    ]);
+    expect(calculationLabel(form.parameters[0].label, "fr-FR")).toBe("Salaire");
+    expect(calculationLabel(form.parameters[0].label, "sw")).toBe("Income");
+    expect(initialCalculationValues(form.parameters, { income: 900 })).toEqual({ income: 900, grade: "B", insured: false });
+    expect((await client.employees.calculationParams("")).success).toBe(false);
+  });
+
+  it("validates calculation inputs like the backend", () => {
+    const { parameters } = parseEmployeeCalculationForm(incomeForm);
+    expect(coerceCalculationValues(parameters, {}).errors.map((e) => e.field)).toEqual(["calculationRule.income"]);
+    expect(coerceCalculationValues(parameters, { income: "abc" }).errors[0].message).toBe("Income must be a number");
+    expect(coerceCalculationValues(parameters, { income: 200, grade: "Z" }).errors[0].field).toBe("calculationRule.grade");
+    expect(coerceCalculationValues(parameters, { income: "200", insured: "yes" }).values).toEqual({ income: 200, grade: "B", insured: true });
+    expect(employeeUploadTemplateCsv(parameters, "SEAD")).toBe(
+      "chf_id,income,grade,insured,policy_holder_contribution_plan_id\r\n070707092,,B,false,SEAD\r\n"
+    );
+  });
+
+  it("reads calculation inputs from the employee resource", () => {
+    const resource = sampleEmployeeFhir();
+    resource.extension = [
+      ...(resource.extension ?? []).filter((e) => !e.url.endsWith("employee-income")),
+      { url: "http://openimis.org/fhir/StructureDefinition/calculation-rule", extension: [{ url: "income", valueDecimal: 4500 }, { url: "grade", valueString: "A" }] },
+    ];
+    const model = new EmployeeFhirConverter().fromFhir(resource);
+    expect(model.calculationRule).toEqual({ income: 4500, grade: "A" });
+    const legacy = new EmployeeFhirConverter().fromFhir({
+      ...resource,
+      extension: [{ url: "http://example.com/fhir/StructureDefinition/employee-income", valueDecimal: 300 }],
+    });
+    expect(legacy.calculationRule).toEqual({ income: 300 });
+  });
+
+  it("updates package and calculation inputs with a portal JSON PATCH", async () => {
     const { http, client } = createClient();
     http.on("PATCH", "/policy-holder-dev-api/employees/abc/", sampleEmployeeFhir());
-    const resp = await client.employees.update("abc", { policyHolderContributionPlanId: " 7 ", income: 5000 });
+    const calculationParams = parseEmployeeCalculationForm(incomeForm).parameters;
+    const resp = await client.employees.update("abc", {
+      policyHolderContributionPlanId: " 7 ",
+      calculationRule: { income: "5000", grade: "A" },
+      calculationParams,
+    });
     expect(resp.success).toBe(true);
-    expect(http.lastCall?.body).toEqual({ policy_holder_contribution_plan_id: "7", income: 5000 });
-    const invalid = await client.employees.update("abc", { income: -1 });
+    expect(http.lastCall?.body).toEqual({
+      policy_holder_contribution_plan_id: "7",
+      calculation_rule: { income: 5000, grade: "A", insured: false },
+    });
+    const invalid = await client.employees.update("abc", { calculationRule: { income: 10 }, calculationParams });
     expect(invalid.success).toBe(false);
     expect(http.calls).toHaveLength(1);
+
+    // The client fetches the employee's parameters when they are not given.
+    http.on("GET", "/policy-holder-dev-api/employees/abc/calculation-params/", { ...incomeForm, values: { income: 900 } });
+    const fetched = await client.updateEmployee("abc", { calculationRule: { income: "10" } });
+    expect(fetched.success).toBe(false);
+    expect(fetched.errorDetails?.[0]?.field).toBe("calculationRule.income");
+
+    // Backend 400s on inputs come back as field errors too.
+    http.onError("PATCH", "/policy-holder-dev-api/employees/def/", 400, "Bad request", [
+      { calculation_rule: { income: "does not meet the condition INPUT>100" } },
+    ]);
+    const rejected = await client.employees.update("def", { calculationRule: { income: 10 } });
+    expect(rejected.errorDetails).toEqual([
+      { field: "calculationRule.income", message: "income does not meet the condition INPUT>100" },
+    ]);
   });
 
   it("returns the insuree photo with the employee profile", async () => {

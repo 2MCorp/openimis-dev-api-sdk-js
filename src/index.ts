@@ -117,9 +117,12 @@ export type {
 export * from "./auth/permissions";
 export * from "./utils";
 export * from "./formalsector/employee_ops";
+export * from "./formalsector/calculation_inputs";
+export { calculationRuleFromExtension, calculationRuleToExtension } from "./fhir_converter/employee";
 export * from "./formalsector/contract_ops";
 export * from "./formalsector/contract_states";
 export * from "./formalsector/payment_status";
+export * from "./formalsector/payment_gateway";
 export type { EmployeeProfile } from "./formalsector";
 export { FormalSectorPatientsClient } from "./formalsector";
 export * from "./dashboard/policy_holder_views";

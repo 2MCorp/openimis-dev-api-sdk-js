@@ -5,13 +5,19 @@ import FormalSectorGroupsClient from "./groups";
 import FormalSectorContractsClient from "./contracts";
 import FormalSectorInsurancePlansClient from "./insurance_plans";
 import FormalSectorPaymentsClient from "./payments";
+import FormalSectorPaymentGatewayClient from "./payment_gateway";
 import FormalSectorStaffsClient from "./staffs";
 import FormalSectorEmployeeClaimsClient from "./employee_claims";
 import FormalSectorPatientsClient from "./patients";
 import { ApiResponse } from "../api_response";
 import { EmployeeModel } from "../models/employee";
 import { PatientModel } from "../models/patient";
-import { EmployeeEnrollmentInput, validateEmployeeEnrollment } from "./employee_ops";
+import {
+  EmployeeEnrollmentInput,
+  EmployeeUpdateInput,
+  validateEmployeeEnrollment,
+} from "./employee_ops";
+import type { CalculationParam } from "./calculation_inputs";
 
 /** Employee record plus the insuree's demographics (null when search-employee fails). */
 export type EmployeeProfile = {
@@ -30,6 +36,7 @@ class FormalSectorDevAPIClient {
   public readonly contracts: FormalSectorContractsClient;
   public readonly insurancePlans: FormalSectorInsurancePlansClient;
   public readonly payments: FormalSectorPaymentsClient;
+  public readonly paymentGateway: FormalSectorPaymentGatewayClient;
   public readonly staffs: FormalSectorStaffsClient;
   public readonly employeeClaims: FormalSectorEmployeeClaimsClient;
   public readonly patients: FormalSectorPatientsClient;
@@ -41,6 +48,7 @@ class FormalSectorDevAPIClient {
     this.contracts = new FormalSectorContractsClient(httpClient);
     this.insurancePlans = new FormalSectorInsurancePlansClient(httpClient);
     this.payments = new FormalSectorPaymentsClient(httpClient);
+    this.paymentGateway = new FormalSectorPaymentGatewayClient(httpClient);
     this.staffs = new FormalSectorStaffsClient(httpClient);
     this.employeeClaims = new FormalSectorEmployeeClaimsClient(httpClient);
     this.patients = new FormalSectorPatientsClient(httpClient);
@@ -50,7 +58,9 @@ class FormalSectorDevAPIClient {
    * Enrol an insuree on one of the employer's health packages.
    * `POST employees/` does not check that the package belongs to this employer
    * (batch upload does), so the package is verified against
-   * `insurancePlans.listEnrollablePackages()` first.
+   * `insurancePlans.listEnrollablePackages()` first. Calculation inputs are checked
+   * against the package's declared parameters (fetched when not given); the backend
+   * validates them again.
    */
   async enrollEmployee(input: EmployeeEnrollmentInput): Promise<ApiResponse<EmployeeModel>> {
     const errors = validateEmployeeEnrollment(input);
@@ -64,7 +74,28 @@ class FormalSectorDevAPIClient {
         { field: "policyHolderContributionPlanId", message: "Unknown health package" },
       ]);
     }
-    return this.employees.enroll(input);
+    const calculationParams =
+      input.calculationParams ?? (await this.packageCalculationParams(planId));
+    return this.employees.enroll({ ...input, calculationParams });
+  }
+
+  /**
+   * Change an employee's package and/or calculation inputs; inputs are checked against
+   * the parameters of the (new) package, fetched when not given.
+   */
+  async updateEmployee(pk: string, input: EmployeeUpdateInput): Promise<ApiResponse<EmployeeModel>> {
+    let calculationParams = input.calculationParams;
+    if (!calculationParams && input.calculationRule != null) {
+      const form = await this.employees.calculationParamsFor(pk, input.policyHolderContributionPlanId);
+      calculationParams = form.success && form.data ? form.data.parameters : undefined;
+    }
+    return this.employees.update(pk, { ...input, calculationParams });
+  }
+
+  /** Declared inputs of a package, or undefined when the backend cannot say. */
+  private async packageCalculationParams(planId: string): Promise<CalculationParam[] | undefined> {
+    const form = await this.employees.calculationParams(planId);
+    return form.success && form.data ? form.data.parameters : undefined;
   }
 
   /**

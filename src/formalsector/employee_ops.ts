@@ -1,6 +1,11 @@
 import { EmployeeModel } from "../models/employee";
 
 import type { FieldError } from "../utils/field_error";
+import {
+  CalculationParam,
+  CalculationValues,
+  coerceCalculationValues,
+} from "./calculation_inputs";
 
 export type { FieldError };
 
@@ -10,9 +15,27 @@ export type EmployeeEnrollmentInput = {
   chfId: string;
   /** PolicyHolderContributionPlan id from `insurancePlans.listEnrollablePackages()`. */
   policyHolderContributionPlanId: string;
-  /** Salary used by the contribution calculation rule. */
-  income?: number;
+  /**
+   * Calculation inputs (income, ...) as declared by the package — see
+   * `employees.calculationParams`. Only the declared inputs are sent.
+   */
+  calculationRule?: Record<string, unknown>;
+  /** Parameters from `employees.calculationParams(planId)`, to validate `calculationRule`. */
+  calculationParams?: readonly CalculationParam[];
 };
+
+/**
+ * Typed calculation values for an input; `errors` is non-empty when they do not match
+ * the parameters. Without parameters the values are passed through for the backend.
+ */
+function calculationValuesFor(
+  calculationRule: Record<string, unknown> | undefined,
+  parameters: readonly CalculationParam[] | undefined
+): { values?: CalculationValues; errors: FieldError[] } {
+  if (calculationRule == null) return { values: undefined, errors: [] };
+  if (!parameters) return { values: calculationRule as CalculationValues, errors: [] };
+  return coerceCalculationValues(parameters, calculationRule);
+}
 
 export function validateEmployeeEnrollment(input: EmployeeEnrollmentInput): FieldError[] {
   const errors: FieldError[] = [];
@@ -25,8 +48,8 @@ export function validateEmployeeEnrollment(input: EmployeeEnrollmentInput): Fiel
       message: "Health package is required",
     });
   }
-  if (input.income != null && (!Number.isFinite(input.income) || input.income < 0)) {
-    errors.push({ field: "income", message: "Income must be a non-negative number" });
+  if (input.calculationParams) {
+    errors.push(...calculationValuesFor(input.calculationRule ?? {}, input.calculationParams).errors);
   }
   return errors;
 }
@@ -34,10 +57,15 @@ export function validateEmployeeEnrollment(input: EmployeeEnrollmentInput): Fiel
 /**
  * EmployeeModel shaped for `POST employees/`. The backend
  * (`EmployeeConverter.to_imis_obj`) resolves the insuree from the first identifier and
- * rejects any extension other than `PolicyHolderContributionPlanID` and
- * `employee-income` — so the bundle display is left unset and income is always sent.
+ * accepts only the `PolicyHolderContributionPlanID`, `calculation-rule` and legacy
+ * `employee-income` extensions — so the bundle display is left unset. Calculation
+ * inputs are sent only when the package declares them (the backend applies defaults).
  */
 export function employeeModelForEnrollment(input: EmployeeEnrollmentInput): EmployeeModel {
+  const { values } = calculationValuesFor(
+    input.calculationRule ?? (input.calculationParams ? {} : undefined),
+    input.calculationParams
+  );
   return new EmployeeModel(
     "",
     "",
@@ -48,29 +76,44 @@ export function employeeModelForEnrollment(input: EmployeeEnrollmentInput): Empl
     undefined,
     undefined,
     undefined,
-    input.income ?? 0,
     undefined,
-    input.policyHolderContributionPlanId.trim()
+    undefined,
+    input.policyHolderContributionPlanId.trim(),
+    undefined,
+    values && Object.keys(values).length ? values : undefined
   );
 }
 
-/** Change an employee's health package and/or income (`PATCH employees/{uuid}/`). */
+/**
+ * Change an employee's health package and/or calculation inputs
+ * (`PATCH employees/{uuid}/`). Stored inputs the (new) package still declares are kept.
+ */
 export type EmployeeUpdateInput = {
   /** PolicyHolderContributionPlan id from `insurancePlans.listEnrollablePackages()`. */
   policyHolderContributionPlanId?: string;
-  income?: number;
+  calculationRule?: Record<string, unknown>;
+  /** Parameters of the (new) package, to validate `calculationRule` before sending. */
+  calculationParams?: readonly CalculationParam[];
 };
 
 export function validateEmployeeUpdate(input: EmployeeUpdateInput): FieldError[] {
   const errors: FieldError[] = [];
   const planId = input.policyHolderContributionPlanId?.trim();
-  if (!planId && input.income == null) {
+  if (!planId && input.calculationRule == null) {
     errors.push({ field: "policyHolderContributionPlanId", message: "Nothing to update" });
   }
-  if (input.income != null && (!Number.isFinite(input.income) || input.income < 0)) {
-    errors.push({ field: "income", message: "Income must be a non-negative number" });
-  }
+  errors.push(...calculationValuesFor(input.calculationRule, input.calculationParams).errors);
   return errors;
+}
+
+/** JSON body of `PATCH employees/{uuid}/` for a validated update. */
+export function employeeUpdateBody(input: EmployeeUpdateInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  const planId = input.policyHolderContributionPlanId?.trim();
+  if (planId) body.policy_holder_contribution_plan_id = planId;
+  const { values } = calculationValuesFor(input.calculationRule, input.calculationParams);
+  if (values) body.calculation_rule = values;
+  return body;
 }
 
 /**
@@ -89,9 +132,12 @@ export const EMPLOYEE_UPLOAD_CONTENT_TYPES = {
  */
 export const EMPLOYEE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
-/** CSV template accepted by the upload (header aliases are resolved server-side). */
+/**
+ * Minimal CSV template accepted by the upload. Columns for calculation inputs depend
+ * on the package — build a full template with `employeeUploadTemplateCsv(parameters)`.
+ */
 export const EMPLOYEE_UPLOAD_TEMPLATE_CSV =
-  "chf_id,income,policy_holder_contribution_plan_id\r\n070707092,4500,PLANCODE\r\n";
+  "chf_id,policy_holder_contribution_plan_id\r\n070707092,PLANCODE\r\n";
 
 export function employeeUploadContentType(fileName: string): string | undefined {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";

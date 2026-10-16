@@ -1,3 +1,5 @@
+import type { CalculationValues } from "../formalsector/calculation_inputs";
+
 export class EmployeeModel {
   constructor(
     public id: string,
@@ -13,10 +15,16 @@ export class EmployeeModel {
     public insureeUuid?: string,
     public birthDate?: string,
     public maritalStatus?: string,
+    /** Legacy `employee-income` value; prefer `calculationRule.income`. */
     public income?: number,
     public contributionPlanBundleDisplay?: string,
     public contributionPlanBundleId?: string,
-    public contributionPlanBundleUuid?: string
+    public contributionPlanBundleUuid?: string,
+    /**
+     * Calculation inputs stored on the employee (`json_ext.calculation_rule`), as
+     * declared by the package's calculation rule sets — see `employees.calculationParams`.
+     */
+    public calculationRule?: CalculationValues
   ) {}
 
   get fullName(): string {

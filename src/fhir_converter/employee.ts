@@ -1,8 +1,11 @@
 /// <reference types="fhir" />
 
 import { EmployeeModel } from "../models/employee";
+import type { CalculationValues } from "../formalsector/calculation_inputs";
 import BaseFhirConverter from "./base";
 import {
+  CALCULATION_RULE_EXTENSION,
+  CALCULATION_RULE_EXTENSION_SUFFIX,
   CONTRIBUTION_PLAN_BUNDLE_SYSTEM,
   EMPLOYEE_CPB_EXTENSION,
   EMPLOYEE_IDENTIFIER_TYPE_SYSTEM,
@@ -16,6 +19,7 @@ import {
 import {
   assertResourceType,
   buildPersonName,
+  getExtension,
   getExtensionDecimal,
   getExtensionString,
   getIdentifierValue,
@@ -33,6 +37,14 @@ class EmployeeFhirConverter extends BaseFhirConverter<
     assertResourceType(resource, "Patient");
     const { family, given } = getUsualOrOfficialName(resource);
     const identifiers = resource.identifier;
+    const income = getExtensionDecimal(resource.extension, "employee-income");
+    const calculationRule = calculationRuleFromExtension(
+      getExtension(resource.extension, CALCULATION_RULE_EXTENSION_SUFFIX)
+    );
+    // Older backends only send employee-income.
+    if (income !== undefined && calculationRule.income === undefined) {
+      calculationRule.income = income;
+    }
 
     return new EmployeeModel(
       resource.id ?? "",
@@ -49,18 +61,20 @@ class EmployeeFhirConverter extends BaseFhirConverter<
         getIdentifierValue(identifiers, { typeCode: "INS" }),
       resource.birthDate,
       resource.maritalStatus?.coding?.[0]?.code,
-      getExtensionDecimal(resource.extension, "employee-income"),
+      income,
       getExtensionString(resource.extension, "contributionPlanBundleId"),
       getExtensionString(resource.extension, EMPLOYEE_PHCP_EXTENSION_SUFFIX),
       getIdentifierValue(identifiers, {
         system: CONTRIBUTION_PLAN_BUNDLE_SYSTEM,
-      }) ?? getIdentifierValue(identifiers, { typeCode: "CPB" })
+      }) ?? getIdentifierValue(identifiers, { typeCode: "CPB" }),
+      calculationRule
     );
   }
 
   /**
    * Builds the inbound-friendly Patient shape expected by EmployeeConverter.to_imis_obj:
-   * first identifier resolves Insuree; income uses valueDecimal; PHCP uses valueString.
+   * first identifier resolves Insuree; calculation inputs go in the nested
+   * `calculation-rule` extension; PHCP uses valueString.
    */
   toFhir(model: EmployeeModel): fhir4.Patient {
     const identifiers: fhir4.Identifier[] = [];
@@ -129,7 +143,9 @@ class EmployeeFhirConverter extends BaseFhirConverter<
     }
 
     const extensions: fhir4.Extension[] = [];
-    if (model.income !== undefined) {
+    const calculationRule = calculationRuleToExtension(model.calculationRule);
+    if (calculationRule) extensions.push(calculationRule);
+    if (model.income !== undefined && model.calculationRule?.income === undefined) {
       extensions.push({
         url: EMPLOYEE_INCOME_EXTENSION,
         valueDecimal: model.income,
@@ -171,6 +187,37 @@ class EmployeeFhirConverter extends BaseFhirConverter<
       extension: extensions.length ? extensions : undefined,
     };
   }
+}
+
+/** `calculation-rule` extension → `{ name: value }` (decimal/integer, boolean, string). */
+export function calculationRuleFromExtension(
+  extension: fhir4.Extension | undefined
+): CalculationValues {
+  const values: CalculationValues = {};
+  for (const sub of extension?.extension ?? []) {
+    if (!sub.url) continue;
+    const value =
+      sub.valueDecimal ?? sub.valueInteger ?? sub.valueBoolean ?? sub.valueString;
+    if (value !== undefined) values[sub.url] = value;
+  }
+  return values;
+}
+
+export function calculationRuleToExtension(
+  values: CalculationValues | undefined
+): fhir4.Extension | undefined {
+  const entries = Object.entries(values ?? {});
+  if (!entries.length) return undefined;
+  return {
+    url: CALCULATION_RULE_EXTENSION,
+    extension: entries.map(([url, value]) =>
+      typeof value === "number"
+        ? { url, valueDecimal: value }
+        : typeof value === "boolean"
+          ? { url, valueBoolean: value }
+          : { url, valueString: value }
+    ),
+  };
 }
 
 export default EmployeeFhirConverter;

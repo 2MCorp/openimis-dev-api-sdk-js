@@ -19,11 +19,28 @@ import {
   EmployeeUpdateInput,
   EmployeeUploadInput,
   employeeModelForEnrollment,
+  employeeUpdateBody,
   employeeUploadContentType,
   validateEmployeeEnrollment,
   validateEmployeeUpdate,
   validateEmployeeUpload,
 } from "./employee_ops";
+import {
+  EmployeeCalculationForm,
+  calculationFieldErrors,
+  parseEmployeeCalculationForm,
+} from "./calculation_inputs";
+
+/** A failed save whose 400 body names calculation inputs, with those as FieldErrors. */
+function withCalculationErrors<T>(response: ApiResponse<T>): ApiResponse<T> {
+  if (response.success) return response;
+  const errors = calculationFieldErrors(response.errorDetails);
+  if (!errors.length) return response;
+  return ApiResponse.fail<T>(response.statusCode, errors[0].message, errors, {
+    path: response.path,
+    method: response.method,
+  });
+}
 
 class FormalSectorEmployeesClient {
   private readonly converter = new EmployeeFhirConverter();
@@ -70,27 +87,58 @@ class FormalSectorEmployeesClient {
     if (errors.length) {
       return ApiResponse.fail("400", errors[0].message, errors);
     }
-    return this.create(employeeModelForEnrollment(input));
+    return withCalculationErrors(await this.create(employeeModelForEnrollment(input)));
   }
 
   /**
-   * Validate and change an employee's health package and/or income. The backend
-   * checks the package belongs to the employer and updates the record in place.
+   * Validate and change an employee's health package and/or calculation inputs. The
+   * backend checks the package belongs to the employer, re-validates the inputs
+   * against the package's rule sets and updates the record in place.
    */
   async update(pk: string, input: EmployeeUpdateInput): Promise<ApiResponse<EmployeeModel>> {
     const errors = validateEmployeeUpdate(input);
     if (errors.length) return ApiResponse.fail("400", errors[0].message, errors);
-    const body: Record<string, unknown> = {};
-    const planId = input.policyHolderContributionPlanId?.trim();
-    if (planId) body.policy_holder_contribution_plan_id = planId;
-    if (input.income != null) body.income = input.income;
     const response = await this.httpClient.patch<unknown>(
       `${PH_BASE_PATH}/employees/${encodeURIComponent(pk)}/`,
-      body
+      employeeUpdateBody(input)
     );
-    return mapData(response, (data) =>
-      this.converter.fromFhir(asFhirResource<fhir4.Patient>(data))
+    return withCalculationErrors(
+      mapData(response, (data) => this.converter.fromFhir(asFhirResource<fhir4.Patient>(data)))
     );
+  }
+
+  /**
+   * Inputs an employee on a health package must provide (income, ...), declared by
+   * the package's calculation rule sets. `planId` is the PolicyHolderContributionPlan id.
+   */
+  async calculationParams(planId: string): Promise<ApiResponse<EmployeeCalculationForm>> {
+    const id = planId?.trim();
+    if (!id) {
+      return ApiResponse.fail("400", "Health package is required", [
+        { field: "policyHolderContributionPlanId", message: "Health package is required" },
+      ]);
+    }
+    const response = await this.httpClient.get<unknown>(
+      `${PH_BASE_PATH}/employees/calculation-params/${buildQuery({
+        policy_holder_contribution_plan_id: id,
+      })}`
+    );
+    return mapData(response, parseEmployeeCalculationForm);
+  }
+
+  /**
+   * An employee's calculation inputs with their stored values. With `planId` the
+   * parameters are those of that package (when changing package).
+   */
+  async calculationParamsFor(
+    pk: string,
+    planId?: string
+  ): Promise<ApiResponse<EmployeeCalculationForm>> {
+    const query = planId?.trim() ? buildQuery({ policy_holder_contribution_plan_id: planId.trim() }) : "";
+    const response = await this.httpClient.get<unknown>(
+      `${PH_BASE_PATH}/employees/${encodeURIComponent(pk)}/calculation-params/${query}`
+    );
+    return mapData(response, parseEmployeeCalculationForm);
   }
 
   /**

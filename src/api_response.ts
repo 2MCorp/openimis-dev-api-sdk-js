@@ -139,6 +139,35 @@ export function defaultErrorMessage(statusCode: number | string): string {
 }
 
 /**
+ * First human-readable message from DRF field errors ({ field: "msg" | ["msg"] })
+ * or non_field_errors, so e.g. { insuree: "Insuree is already linked ..." }
+ * surfaces instead of a generic "Bad request".
+ */
+function firstFieldMessage(record: Record<string, unknown>): string | undefined {
+  const first = (value: unknown): string | undefined => {
+    if (typeof value === "string") return value || undefined;
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = first(item);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const nonField = first(record.non_field_errors);
+  if (nonField) return nonField;
+
+  const skip = ["detail", "message", "error", "errors", "error_details", "traceback", "trace", "data"];
+  for (const [key, value] of Object.entries(record)) {
+    if (skip.includes(key)) continue;
+    const found = first(value);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
  * Extract a human message + structured error details from a DRF / FHIR / plain body.
  */
 export function parseErrorBody(body: unknown, statusCode: number | string): {
@@ -222,6 +251,7 @@ export function parseErrorBody(body: unknown, statusCode: number | string): {
     (typeof record.detail === "string" && record.detail) ||
     (typeof record.message === "string" && record.message) ||
     (typeof record.error === "string" && record.error) ||
+    firstFieldMessage(record) ||
     fallback;
 
   return {

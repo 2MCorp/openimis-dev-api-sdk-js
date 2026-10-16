@@ -22,6 +22,10 @@ export const EMPLOYEE_IDENTIFIER_TYPE_SYSTEM =
 
 export const EMPLOYEE_INCOME_EXTENSION =
   "http://example.com/fhir/StructureDefinition/employee-income";
+/** Nested extension carrying the employee's calculation inputs (one sub-extension per input). */
+export const CALCULATION_RULE_EXTENSION =
+  "http://openimis.org/fhir/StructureDefinition/calculation-rule";
+export const CALCULATION_RULE_EXTENSION_SUFFIX = "calculation-rule";
 export const EMPLOYEE_CPB_EXTENSION =
   "http://example.com/fhir/StructureDefinition/contributionPlanBundleId";
 export const EMPLOYEE_PHCP_EXTENSION_SUFFIX = "PolicyHolderContributionPlanID";
