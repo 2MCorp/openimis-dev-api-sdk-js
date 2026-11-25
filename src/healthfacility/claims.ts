@@ -38,6 +38,17 @@ class HealthFacilityClaimsClient {
     );
   }
 
+  /** POST claims/ — create a claim from a model; response is the created FHIR Claim. */
+  async create(claim: ClaimModel): Promise<ApiResponse<ClaimModel>> {
+    const response = await this.httpClient.post<unknown>(
+      `${HF_BASE_PATH}/claims/`,
+      this.converter.toFhir(claim)
+    );
+    return mapData(response, (data) =>
+      this.converter.fromFhir(asFhirResource<fhir4.Claim>(data))
+    );
+  }
+
   async update(identifier: string, claim: ClaimModel): Promise<ApiResponse<ClaimModel>> {
     const response = await this.httpClient.put<unknown>(
       `${HF_BASE_PATH}/claims/${encodeURIComponent(identifier)}/`,

@@ -242,6 +242,93 @@ try {
 }
 ```
 
+## Portal common (`openimis-dev-api-sdk-js/portal/*`)
+
+Framework-agnostic logic shared by the health-facility and employer portals (Next.js, SvelteKit or anything else). Nothing here imports a web framework; the apps keep only UI, route handlers and cookie plumbing. The main entry (`.`) does **not** import `jose`, `dexie` or `zod`.
+
+| Subpath | Runs in | Heavy deps | Contents |
+|---|---|---|---|
+| `openimis-dev-api-sdk-js/portal` | server + browser | zod | re-exports `portal/common` |
+| `openimis-dev-api-sdk-js/portal/common` | server + browser | zod | errors, response envelopes, paging, env, SDK factory, backend probe, formatting, money, validation |
+| `openimis-dev-api-sdk-js/portal/server` | server / edge | jose | sealed session cookie codec |
+| `openimis-dev-api-sdk-js/portal/client` | browser only | dexie | fetch client, IndexedDB cache, SWR controller, offline session, SSE, desktop notifications |
+| `openimis-dev-api-sdk-js/portal/healthfacility`, `.../employer` | see their own sections | | app-specific logic |
+
+### `portal/common`
+
+- `toUserFacingApiError(statusCode, rawMessage?)` - safe UI message for an SDK/HTTP failure (HTML, tracebacks and long text are dropped).
+- Envelopes (`{ status, body }`, body = `ApiEnvelope<T>` = `{success:true,data} | {success:false,error,fieldErrors?}`): `apiOk(data, status?)`, `apiFail(status, message)`, `sdkFail(resp, fallback?)`, `fromSdkResponse(resp, map, notFoundMessage?)`, `fromBackendResult(result, {status?, notFoundMessage?})`. Route handlers do `NextResponse.json(r.body, { status: r.status })`.
+- `BackendResult`, `fromApiResponse(resp)`, `httpStatus(result, fallback?)` - normalised SDK outcome for form handlers.
+- Paging/query: `parsePositiveInt(value, fallback, max?)`, `parseFhirPageOffset(value)` (1-based), `pagingFromSearchParams(params, defaultCount?, maxCount?)`, `buildQueryString(params)`.
+- Env: `getDeveloperApiBase(publicBaseApiUrl)`, `onlinePaymentsEnabled(envValue)`.
+- `createSdk(baseUrl, accessToken?, policyHolderCode?)` - fresh `OpenIMISDevApiSdk` per call.
+- `createBackendProbe({ baseUrl, ... }).isReachable()` - cached reachability check (any HTTP response = up).
+- Display: `initials`, `userDisplayName`, `userInitials`, `formatDate`, `formatShortDate`, `formatDateTimeParts`, `formatNumber`, `formatMoney`, `formatRatio`, `formatPercent`, `formatDelta`, `formatAddressLine`.
+- Money: `DEFAULT_MONEY_CONFIG`, `normalizeMoneyConfig`, `formatConfiguredMoney`.
+- Types: `SearchPageDto`, `AddressDto`, `MoneyClientConfigDto`, `ApiEnvelope`, `EnvelopeResult`, `NameFields`.
+- Chart palette: `chartColors`, `employerColors`.
+- Validation (zod): `signInSchema`, `registerSchema`, `verifyEmailSchema`, `resendVerifySchema`, `enrollmentRegisterSchema`, `accountClaimSchema`, `createStaffSchema`, `updateStaffSchema`, `formBoolean`, `HF_LEVELS`, `HF_CARE_TYPES`, `HF_STAFF_ROLES`, `addEmployeeBody`, `updateEmployeeBody`, `uploadEmployeesBody`, `createContractBody`, `payContractBody`.
+
+### `portal/server`
+
+- `createSessionCodec<User>({ secret, cookieName, normalizeUser?, now? })` -> `{ seal(session), unseal(token) }`: AES-256-GCM encrypted JWT (`jose`, Web Crypto, edge-safe); `unseal` returns `null` for bad/expired tokens; `seal` throws above `MAX_SESSION_COOKIE_BYTES`.
+- `normalizeExpiry(raw, now?)`, `sessionCookieOptions(expiresAt, secure?)`, `MAX_SESSION_COOKIE_BYTES`, types `SessionUserBase`, `SessionData`, `SessionCodec`.
+
+### `portal/client`
+
+- `fetchApiJson<T>(url, init?, { offlineMessage?, sessionExpiredEvent? })`, `ApiClientError` (`status`, `fieldErrors`, `notFound`, `unauthorized`).
+- Cache (Dexie): `createPortalCache(config)` (generic), `createHfCache()`, `createEmployerCache()` with `getEntry/setEntry/deleteEntry/clearNamespace/clearAllEntries/countEntriesByNamespace/wipe`, settings (`defaultSettings/loadSettings/saveSettings/mergeSettings/readSettingsFromLocalStorage/isNamespaceEnabled`) and recent rows (`listRecent/pushRecent/clearRecent/removeRecent`); `isEntryStale`, `hashPayload`, `stableStringify`, key builders (`hfScopeKey`, `employerScopeKey`, `buildScopeKey`, `buildCacheId`, `listPath`, `detailPath`, `dashboardPath`, `patientSearchPath`), constants (`HF_CACHE_NAMESPACES`, `EMPLOYER_CACHE_NAMESPACES`, `CACHE_TTL_OPTIONS`, `DEFAULT_CACHE_TTL_MS`).
+- `createSwrController(cache, options)` - stale-while-revalidate state machine (`getState/subscribe/load/refresh/seed`), wrap in `useSyncExternalStore`.
+- `createMissingIdStore({ storageKey })` / `createMissingPatientStore()` - session-scoped "known 404" ids.
+- Offline: `createSessionSnapshotStore(cache)` (`save/read/clear`, `MAX_OFFLINE_AGE_MS`), `isBrowserOnline`, `subscribeOnlineStatus`, `isOffline(serverFallback?)`, `watchServiceWorkerUpdates({ onUpdateAvailable, reload? })`.
+- Notifications: `notificationHref(item)`, `notificationSecondaryLabel(item)`, `createDesktopNotifications({ prefKey, tagPrefix, navigate })`, `createSseNotificationClient({ streams, onPayload, onConnectionChange })`.
+
+Tests live in `tests/portal_common/` (IndexedDB is faked with `fake-indexeddb`).
+
+### `portal/employer`
+
+Employer (policy-holder) portal logic, with no web-framework imports and no zod. Import from `openimis-dev-api-sdk-js/portal/employer`. A Next.js route handler is: read the sealed session → `authorizeEmployerRoute(user, "GET /api/members", { onlinePayments })` → `handleMembersList(sdk, url.searchParams)` → `Response.json(result.body, { status: result.status })`, where `sdk` is `createSdk(token, policyHolderCode)` from `portal/common`.
+
+| Module | Contents |
+| --- | --- |
+| `routes` | One `handleXxx(sdk, input)` per API route returning `{ status, body: { success, data } \| { success: false, error, fieldErrors?, rowErrors? } }`; `authorizeEmployerRoute` (404 payments-off, 401, 403) and `EMPLOYER_ROUTE_PERMISSIONS` |
+| `reports` | `handleReportDownload(sdk, kind)` → CSV (BOM, `Content-Disposition`) or an error envelope; column definitions |
+| `auth`, `enrollment`, `staff` | Form actions returning structured results (`{ ok: true, session \| redirectTo \| state }` or `{ ok: false, status, values, errors, message, code }`) so the framework layer only sets cookies and redirects; password-reset cookie state helpers |
+| `forms`, `validation` | Plain form / JSON-body parsers on top of the SDK validators (first message per field) |
+| `session`, `layout`, `access` | `mapSessionUser`, `switchEmployer`, `appGate` / `enrollmentGate` / `guestRedirect`, `accessFor`, `routeAccessKey` |
+| `serialize`, `dto` | SDK models to plain JSON DTOs and their types |
+| `navigation`, `calculation`, `labels`, `checkout`, `upload`, `paths` | Nav entries (plain strings: icon name, i18n key, permission), calculation-input display helpers (locale passed in), i18n message-key mapping and status tones, checkout planning and polling constants, upload constraints and pre-checks, route paths |
+
+```ts
+import { authorizeEmployerRoute, handleMembersList } from "openimis-dev-api-sdk-js/portal/employer";
+
+export async function GET(req: Request) {
+  const session = await readSession(req); // your cookie plumbing
+  const denied = authorizeEmployerRoute(session?.user, "GET /api/members");
+  const result = denied ?? (await handleMembersList(createSdk(session!.accessToken, session!.user.policyHolder?.code), new URL(req.url).searchParams));
+  return Response.json(result.body, { status: result.status });
+}
+```
+
+### `portal/healthfacility`
+
+Health-facility portal logic (no web-framework imports). Import from `openimis-dev-api-sdk-js/portal/healthfacility`. Built on `portal/common` (`EnvelopeResult`, `toUserFacingApiError`, `BackendResult`, zod auth/HF schemas, `normalizeExpiry`). A Next.js route handler is: read the sealed session → `handleClaimsList(createSdk(base, token), url.searchParams)` → `Response.json(result.body, { status: result.status })`; every body is `{ success: true, data } | { success: false, error }` exactly like the original SvelteKit routes.
+
+| Module | Contents |
+| --- | --- |
+| `claims-handlers`, `preauth-handlers`, `catalog-handlers`, `bulk-handlers`, `patient-config-handlers`, `staffs`, `enrollment`, `auth` | One `handleXxx(sdk, ...)` per API route (query-param parsing, validation, SDK call, error mapping, status codes) |
+| `serialize`, `types`, `dashboard-types` | SDK models to plain JSON DTOs (patients, claims/encounters, preauthorizations, search pages) and their types |
+| `dashboard` | Raw metrics/analytics to view models (`serializeMetrics`, `serializeAnalytics`), `parseDashboardQuery`, `loadHealthFacilityDashboard`, `handleDashboard` |
+| `claim-model`, `claim-lines`, `claim-enrich` | Write bodies to `ClaimModel`, editable/submittable statuses, submit-id parsing, canonical record ids, patient labels, line split/total/money helpers, patient-name enrichment |
+| `bulk-csv` | CSV template/build/rewrite (claims vs encounters visit-type rules), row validation |
+| `catalog` | Paged catalog search, option/price helpers, `resolveCatalogUnitPrice(kind, option, fetchJson)` |
+| `permissions`, `navigation`, `access` | Session permission slimming (cookie size), route to permission map, nav entries (icon / i18n key as plain strings), `resolveAppAccess` / `resolveEnrollmentAccess` / `postLoginPath` redirect decisions |
+| `auth` | `mapUser` (slim permissions, no groups), `loginWithCredentials`, `fetchSessionUser`, form actions `submitSignIn` / `submitRegistration` / `submitVerifyEmail` / `submitResendVerification` returning `{ ok: true, ... }` or `{ ok: false, status, errors, message, values }` |
+| `staffs`, `enrollment` | Route handlers plus page loaders and form actions (`loadStaffsPage`, `submitCreateStaff`, `loadEnrollmentStatus`, `submitEnrollmentRegister`, ...) |
+| `sse`, `notifications`, `patients-format` | `proxyHfSse(request, ...)` returning a standard `Response`, notification deep links, patient display helpers |
+
+Tests live in `tests/portal_healthfacility/`.
+
 ## Development
 
 ```bash
